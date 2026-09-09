@@ -5,9 +5,9 @@ import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { CATEGORIES, UNITS, PACKAGING_TYPES } from '../utils/constants';
-import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets } from 'lucide-react';
+import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets, History, Sparkles } from 'lucide-react';
 
-export const InventoryPage = ({ setActiveTab }) => {
+export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
   const { user } = useAuth();
   const { addToast } = useNotification();
   const [inventory, setInventory] = useState([]);
@@ -15,6 +15,11 @@ export const InventoryPage = ({ setActiveTab }) => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // History Modal State
+  const [historyBatch, setHistoryBatch] = useState(null);
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Edit Modal State
   const [editingItem, setEditingItem] = useState(null);
@@ -84,13 +89,26 @@ export const InventoryPage = ({ setActiveTab }) => {
     }
   };
 
+  const handleViewHistory = async (item) => {
+    setHistoryBatch(item);
+    setHistoryLoading(true);
+    try {
+      const history = await api.get(`/freshness/inventory/${item.id}/freshness-history`);
+      setHistoryRecords(history);
+    } catch (err) {
+      addToast(err.message || 'Failed to load freshness history', 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-slate-800">
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight">Food Inventory Management</h2>
-          <p className="text-xs text-slate-400 mt-1">Track physical batches, storage conditions, and expiry timelines</p>
+          <p className="text-xs text-slate-400 mt-1">Track physical batches, storage conditions, and freshness history</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -112,7 +130,6 @@ export const InventoryPage = ({ setActiveTab }) => {
       {/* Filter Toolbar */}
       <div className="glass-card p-4 rounded-2xl border border-slate-800 space-y-4">
         <div className="flex flex-col md:flex-row items-center gap-4 justify-between">
-          {/* Search bar */}
           <div className="relative w-full md:w-80">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
             <input
@@ -124,7 +141,6 @@ export const InventoryPage = ({ setActiveTab }) => {
             />
           </div>
 
-          {/* Status Filter */}
           <div className="flex items-center gap-2 w-full md:w-auto">
             <Filter className="w-4 h-4 text-slate-400" />
             <select
@@ -152,33 +168,6 @@ export const InventoryPage = ({ setActiveTab }) => {
             </select>
           </div>
         </div>
-
-        {/* Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 scrollbar-none">
-          <button
-            onClick={() => setSelectedCategory('')}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-              selectedCategory === '' 
-                ? 'bg-emerald-500 text-white' 
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
-          >
-            All Categories
-          </button>
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                selectedCategory === cat 
-                  ? 'bg-emerald-500 text-white' 
-                  : 'bg-slate-800/80 text-slate-400 hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Inventory Table */}
@@ -200,10 +189,7 @@ export const InventoryPage = ({ setActiveTab }) => {
             <tbody className="divide-y divide-slate-800/60 text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500 mx-auto mb-2" />
-                    Loading inventory records...
-                  </td>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">Loading inventory records...</td>
                 </tr>
               ) : inventory.length > 0 ? (
                 inventory.map((item) => (
@@ -242,6 +228,13 @@ export const InventoryPage = ({ setActiveTab }) => {
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleViewHistory(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 transition"
+                          title="View Freshness AI History"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleEditOpen(item)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
                           title="Edit Batch"
@@ -263,15 +256,69 @@ export const InventoryPage = ({ setActiveTab }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    No matching inventory batches found.
-                  </td>
+                  <td colSpan={8} className="py-12 text-center text-slate-500">No matching inventory batches found.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Freshness History Modal */}
+      <Modal isOpen={!!historyBatch} onClose={() => setHistoryBatch(null)} title={`Freshness AI History — ${historyBatch?.batch_number}`}>
+        <div className="space-y-4 text-xs">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
+            <div>
+              <span className="font-bold text-white">{historyBatch?.food_item?.name}</span>
+              <span className="text-[10px] text-slate-400 block">{historyBatch?.food_item?.category}</span>
+            </div>
+            <button
+              onClick={() => {
+                setHistoryBatch(null);
+                setActiveTab('freshness-analysis');
+              }}
+              className="px-3 py-1.5 rounded-lg font-bold text-xs bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Analyze Image for Batch
+            </button>
+          </div>
+
+          {historyLoading ? (
+            <div className="py-8 text-center text-slate-400">Loading batch freshness history...</div>
+          ) : historyRecords.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {historyRecords.map((rec) => (
+                <div key={rec.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img src={rec.image_path} alt="Analysis" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                    <div>
+                      <div className="font-bold text-white">Score: {rec.freshness_score} / 100</div>
+                      <div className="text-[10px] text-slate-400">{new Date(rec.created_at).toLocaleString()}</div>
+                      <div className="text-[10px] text-amber-400 mt-0.5">Spoilage Prob: {(rec.spoilage_probability * 100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={rec.predicted_category} />
+                    <button
+                      onClick={() => {
+                        setHistoryBatch(null);
+                        onSelectReport(rec);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                    >
+                      Report
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-slate-500">
+              No image analysis history linked to this batch yet.
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal isOpen={!!editingItem} onClose={() => setEditingItem(null)} title="Edit Inventory Batch">
@@ -357,19 +404,8 @@ export const InventoryPage = ({ setActiveTab }) => {
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => setEditingItem(null)}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition"
-            >
-              Save Changes
-            </button>
+            <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white">Cancel</button>
+            <button type="submit" className="px-5 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition">Save Changes</button>
           </div>
         </form>
       </Modal>

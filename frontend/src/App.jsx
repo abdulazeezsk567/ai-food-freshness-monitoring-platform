@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 
 import { DashboardPage } from './pages/DashboardPage';
+import { FreshnessAnalysisPage } from './pages/FreshnessAnalysisPage';
+import { FreshnessReportPage } from './pages/FreshnessReportPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { AddFoodItemPage } from './pages/AddFoodItemPage';
 import { BatchManagementPage } from './pages/BatchManagementPage';
@@ -21,6 +23,7 @@ const AppContent = () => {
   const { user, loading } = useAuth();
   const [publicView, setPublicView] = useState('landing'); // 'landing', 'login', 'register'
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedReport, setSelectedReport] = useState(null);
 
   if (loading) {
     return (
@@ -37,13 +40,29 @@ const AppContent = () => {
     return <LandingPage onNavigate={setPublicView} />;
   }
 
+  const handleSelectReport = (report) => {
+    setSelectedReport(report);
+    setActiveTab('report-view');
+  };
+
   // Render Authenticated Dashboard Layout
   const renderAuthenticatedPage = () => {
+    if (activeTab === 'report-view' && selectedReport) {
+      return (
+        <FreshnessReportPage
+          report={selectedReport}
+          onBack={() => setActiveTab('freshness-analysis')}
+        />
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <DashboardPage setActiveTab={setActiveTab} />;
+      case 'freshness-analysis':
+        return <FreshnessAnalysisPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
       case 'inventory':
-        return <InventoryPage setActiveTab={setActiveTab} />;
+        return <InventoryPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
       case 'add-item':
         return <AddFoodItemPage setActiveTab={setActiveTab} />;
       case 'batches':

@@ -28,6 +28,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Uploads & Media
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # IDE & System
 .vscode/
 .idea/
