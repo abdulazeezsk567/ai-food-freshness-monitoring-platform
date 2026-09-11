@@ -15,8 +15,48 @@ import {
   ShieldCheck, 
   Eye, 
   Trash2,
-  PieChart
+  PieChart,
+  Check
 } from 'lucide-react';
+
+const SAMPLE_IMAGES = [
+  {
+    id: 'apple',
+    name: 'Fresh Gala Apple',
+    category: 'Fruits',
+    badge: 'Fresh Target',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    url: '/sample_images/sample_fresh_apple.jpg',
+    filename: 'fresh_gala_apple.jpg'
+  },
+  {
+    id: 'avocado',
+    name: 'Fresh Hass Avocado',
+    category: 'Fruits',
+    badge: 'Fresh Target',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    url: '/sample_images/sample_fresh_avocado.jpg',
+    filename: 'fresh_hass_avocado.jpg'
+  },
+  {
+    id: 'spoiled',
+    name: 'Spoiled Produce (Browning/Mold)',
+    category: 'Fruits',
+    badge: 'Spoilage Target',
+    badgeColor: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    url: '/sample_images/sample_spoiled_produce.jpg',
+    filename: 'spoiled_produce.jpg'
+  },
+  {
+    id: 'spinach',
+    name: 'Fresh Spinach Leaves',
+    category: 'Vegetables',
+    badge: 'Fresh Target',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    url: '/sample_images/sample_fresh_spinach.jpg',
+    filename: 'fresh_spinach_leaves.jpg'
+  }
+];
 
 export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
   const { addToast } = useNotification();
@@ -29,6 +69,7 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [pastResults, setPastResults] = useState([]);
+  const [activeSampleId, setActiveSampleId] = useState(null);
 
   useEffect(() => {
     const loadInventoryAndHistory = async () => {
@@ -60,6 +101,7 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     setResult(null);
+    setActiveSampleId(null);
   };
 
   const handleDrop = (e) => {
@@ -69,10 +111,27 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
     }
   };
 
+  const loadSampleImage = async (sample) => {
+    try {
+      const res = await fetch(sample.url);
+      const blob = await res.blob();
+      const file = new File([blob], sample.filename, { type: 'image/jpeg' });
+      
+      setSelectedFile(file);
+      setPreviewUrl(sample.url);
+      setFoodCategory(sample.category);
+      setResult(null);
+      setActiveSampleId(sample.id);
+      addToast(`Loaded preset sample: ${sample.name}`, 'info');
+    } catch (err) {
+      addToast('Failed to load sample image.', 'error');
+    }
+  };
+
   const handleAnalyze = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      addToast('Please select or drop an image file first.', 'warning');
+      addToast('Please select an image or click a 1-click sample food image.', 'warning');
       return;
     }
 
@@ -117,6 +176,7 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setResult(null);
+    setActiveSampleId(null);
   };
 
   return (
@@ -134,12 +194,58 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
         </span>
       </div>
 
+      {/* 1-Click Sample Test Food Images Bar */}
+      <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            📸 Quick 1-Click Sample Food Images to Identify Freshness
+          </span>
+          <span className="text-[10px] text-slate-400">Click any preset image to analyze instantly</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {SAMPLE_IMAGES.map((sample) => {
+            const isSelected = activeSampleId === sample.id;
+            return (
+              <div
+                key={sample.id}
+                onClick={() => loadSampleImage(sample)}
+                className={`glass-panel p-3 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col items-center text-center space-y-2 group ${
+                  isSelected
+                    ? 'border-purple-500 bg-purple-950/30 ring-2 ring-purple-500/40'
+                    : 'border-slate-800 hover:border-purple-500/40 bg-slate-900/40'
+                }`}
+              >
+                <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700">
+                  <img
+                    src={sample.url}
+                    alt={sample.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  {isSelected && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-purple-500 text-white flex items-center justify-center shadow">
+                      <Check className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+                <div className="w-full">
+                  <span className="text-xs font-bold text-white block truncate">{sample.name}</span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border inline-block mt-1 ${sample.badgeColor}`}>
+                    {sample.badge}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Upload & Form Column */}
         <div className="lg:col-span-5 space-y-6">
           <form onSubmit={handleAnalyze} className="glass-card p-6 rounded-2xl border border-slate-800 space-y-5">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Upload className="w-4 h-4 text-emerald-400" /> 1. Upload Food Image
+              <Upload className="w-4 h-4 text-emerald-400" /> Upload or Selected Image
             </h3>
 
             {/* Dropzone */}
@@ -395,7 +501,7 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
                   ))
                 ) : (
                   <div className="py-12 text-center text-slate-500 text-xs">
-                    No image analysis records yet. Upload your first food image to get started!
+                    No image analysis records yet. Click a sample food image above or upload an image!
                   </div>
                 )}
               </div>
