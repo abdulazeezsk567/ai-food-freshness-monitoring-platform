@@ -29,8 +29,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="AI-powered Food Freshness Monitoring Platform - REST API",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None,
+    redoc_url=None,
     lifespan=lifespan
 )
 
@@ -60,8 +60,6 @@ def root():
         "status": "online",
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT,
-        "docs": "/docs",
-        "redoc": "/redoc",
         "version": "2.0.0"
     }
 

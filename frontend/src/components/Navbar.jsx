@@ -29,16 +29,6 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
         </div>
 
         <div className="flex items-center gap-4">
-          <a
-            href="http://localhost:8000/docs"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700 transition"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            API Swagger Docs
-          </a>
-
           {user && (
             <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
               <div 
