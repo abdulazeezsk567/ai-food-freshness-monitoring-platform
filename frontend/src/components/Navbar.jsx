@@ -21,11 +21,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             <Leaf className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white tracking-tight leading-none flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white tracking-tight leading-none">
               Fresh Guard
-              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Milestone 1
-              </span>
             </h1>
             <p className="text-xs text-slate-400 font-medium">Food Freshness Monitoring Platform</p>
           </div>
