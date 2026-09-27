@@ -11,6 +11,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FreshnessAnalysisPage } from './pages/FreshnessAnalysisPage';
 import { FreshnessReportPage } from './pages/FreshnessReportPage';
+import { ShelfLifePage } from './pages/ShelfLifePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { AddFoodItemPage } from './pages/AddFoodItemPage';
 import { BatchManagementPage } from './pages/BatchManagementPage';
@@ -61,6 +62,8 @@ const AppContent = () => {
         return <DashboardPage setActiveTab={setActiveTab} />;
       case 'freshness-analysis':
         return <FreshnessAnalysisPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
+      case 'shelf-life':
+        return <ShelfLifePage />;
       case 'inventory':
         return <InventoryPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
       case 'add-item':

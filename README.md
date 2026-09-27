@@ -12,24 +12,47 @@ The **AI-Powered Food Freshness Detection and Predictive Shelf Life Monitoring P
 
 ---
 
+## Milestone 3 Implementation Scope (COMPLETED)
+
+Milestone 3 expands the platform with full **Predictive Shelf-Life Monitoring & Risk Assessment** capabilities:
+
+- **Feature Engineering Layer (`backend/app/ml/shelf_life_features.py`)**:
+  - **Category Baseline Shelf Life**: Preserves baseline shelf life per food category (e.g., Leafy Greens = 7 days, Meat/Poultry = 4 days, Bakery = 5 days, Dairy = 10 days, Fruits = 14 days, Root Vegetables = 30 days).
+  - **Storage Duration & Age**: Calculates total elapsed time in storage from inventory batch purchase date.
+  - **Environmental Stress Factors**: Quantifies temperature degradation factor ($Q_{10}$ kinetic model) and humidity loss factor relative to optimal storage profiles.
+  - **Historical Visual Degradation Rate**: Computes degradation velocity ($\Delta \text{Score} / \Delta t$) across sequential visual image assessments.
+- **Predictive Model Engine (`backend/app/ml/shelf_life_model.py` - Model `shelf-life-baseline-v1`)**:
+  - **Remaining Shelf-Life Estimation**: Calculates expected remaining days until spoilage based on composite degradation rate.
+  - **Estimated Expiry Date**: Computes projected expiry date ($T_{current} + \text{Remaining Days}$), explicitly labeled as an AI estimate.
+  - **Risk Classification**: Classifies batches into 4 operational risk levels (`LOW RISK`, `MEDIUM RISK`, `HIGH RISK`, `CRITICAL`).
+  - **Freshness Degradation Trend**: Tracks quality trajectory (`Improving`, `Stable`, `Declining`, `Insufficient Data` for $<2$ assessments).
+  - **Storage Impact Analysis & Actionable Guidance**: Generates human-readable explanations of environmental impact (e.g. thermal acceleration, moisture loss) and customized storage recommendations (e.g. lower storage temp to 4°C, adjust RH to 85-90%).
+- **Database Schema Extensions (`backend/app/models/`)**:
+  - `StorageCondition`: Tracks temperature (°C), relative humidity (%), storage facility type (`REFRIGERATED`, `COLD_ROOM`, `FREEZER`, `AMBIENT`, `DISPLAY`), and direct sunlight exposure.
+  - `ShelfLifePrediction`: Persists prediction records, remaining days, estimated expiry date, risk level, degradation trend, storage impact, guidance, input features, and model version.
+- **REST API Routers (`backend/app/routers/`)**:
+  - `POST /api/shelf-life/predict`: Predict remaining shelf life for an inventory batch.
+  - `GET /api/shelf-life/inventory/{inventory_id}`: Retrieve latest shelf life forecast.
+  - `GET /api/shelf-life/history/{inventory_id}`: Retrieve full prediction audit history.
+  - `POST /api/storage-conditions`: Log environmental storage conditions.
+  - `GET /api/storage-conditions/inventory/{inventory_id}`: List logged storage history.
+- **Frontend Predictive Shelf-Life Inspector (`frontend/src/pages/ShelfLifePage.jsx`)**:
+  - Remaining days gauge with color-coded risk indicators.
+  - Estimated expiry date badge and degradation trend tracker.
+  - Interactive Storage Condition Inspector for live "what-if" environmental scenarios (modifying temperature, humidity, storage type, and sunlight exposure).
+  - Degradation trend graph and storage condition impact breakdown.
+  - Integration with `InventoryPage` via "Shelf-Life Forecast" button and navigation `Sidebar`.
+
+---
+
 ## Milestone 2 Implementation Scope (COMPLETED)
 
 Milestone 2 expands the platform with full **Image Analysis & Visual Freshness Assessment** capabilities:
 
-- **Food Image Upload & Validation**: Secure file dropzone supporting JPG, PNG, and WEBP formats up to 10MB, with size/format verification and filename sanitization.
-- **Computer Vision Pipeline (`backend/app/ml/`)**:
-  - **Preprocessing**: RGB conversion, standardization, resizing, and blur detection via Laplacian variance.
-  - **Color Analysis**: RGB to HSV & LAB color space conversion, Browning Index (BI) calculation, and surface discoloration ratio estimation.
-  - **Texture Analysis**: Grayscale local homogeneity, GLCM contrast, and Laplacian gradient variance.
-  - **Spoilage Indicator Detection**: Multi-indicator analysis for Color Degradation, Surface Texture Changes, Mold Spot Detection, Bruising/Soft Spots, and Physical Damage.
-  - **Freshness Classification**: Multi-class classification into 5 categories (`Fresh`, `Good`, `Acceptable`, `Near Spoilage`, `Spoiled`) with softmax probability distributions.
-  - **Freshness Score**: Transparent 0–100 Freshness Score formula and Spoilage Probability ($P(\text{Near Spoilage}) + P(\text{Spoiled})$).
-- **Database Schema Extension**: `AnalysisResult` SQLAlchemy model storing complete metric JSON payloads, visual indicators, model versions, and uploaded image paths.
-- **ML Training Infrastructure (`ml/`)**: Synthetic feature dataset generator, training script (`train_classifier.py`), baseline classifier, and evaluation metrics report (`eval_report.md` - Test Accuracy: 97.33%).
-- **Frontend Analysis & Inspection Workflows**:
-  - Interactive `/freshness-analysis` page with live preview, score gauge, color/texture decomposition cards, and spoilage indicators audit.
-  - Printable / downloadable formal Freshness Inspection Report.
-  - Inventory Page integration with batch-linked Freshness History modal.
+- **Food Image Upload & Validation**: Secure file dropzone supporting JPG, PNG, and WEBP formats up to 10MB.
+- **Computer Vision Pipeline (`backend/app/ml/`)**: Preprocessing, color analysis (Browning Index), texture analysis (GLCM), spoilage indicator detection, and 5-category freshness classification.
+- **Database Schema Extension**: `AnalysisResult` model storing visual analysis metrics.
+- **Frontend Analysis & Inspection Workflows**: `/freshness-analysis` page, printable inspection reports, and batch freshness history.
 
 ---
 
@@ -38,22 +61,22 @@ Milestone 2 expands the platform with full **Image Analysis & Visual Freshness A
 - **Backend**: Python, FastAPI, SQLAlchemy ORM, Pydantic v2, PyJWT, bcrypt, Pillow, OpenCV, NumPy
 - **Frontend**: React.js, JavaScript, Tailwind CSS, Lucide Icons, Vite
 - **Database**: PostgreSQL (Primary) / SQLite (Development fallback)
-- **ML & Computer Vision**: Pillow, OpenCV, NumPy, Scikit-learn (Baseline nearest centroid & softmax classifier)
+- **ML & Computer Vision**: Pillow, OpenCV, NumPy, Scikit-learn, Custom Shelf-Life Predictive Engine (`shelf-life-baseline-v1`)
 - **Authentication**: JWT (JSON Web Tokens), OAuth2 Password Bearer, bcrypt
-- **Tools & Infrastructure**: Git, GitHub, Docker, Docker Compose, Pytest, Uvicorn
+- **Tools & Infrastructure**: Git, GitHub, Docker, Pytest, Uvicorn
 
 ---
 
-## Features Implemented (Milestones 1 & 2)
+## Features Implemented (Milestones 1, 2 & 3)
 
-- **Authentication System**: User registration, JWT login, profile endpoint (`/api/auth/me`), and frontend logout.
+- **Authentication System**: User registration, JWT login, profile endpoint, and frontend logout.
 - **Role-Based Authorization**: Granular route guards for 5 distinct roles (`CONSUMER`, `RETAIL_MANAGER`, `WAREHOUSE_OPERATOR`, `FOOD_QUALITY_INSPECTOR`, `ADMINISTRATOR`).
 - **Inventory & Batch Tracking**: Manage food products, batch codes, quantities, purchase dates, and expiration dates.
-- **Cold-Chain Environmental Telemetry**: Track storage temperature (°C), relative humidity (%), packaging formats, and storage duration.
+- **Cold-Chain Environmental Telemetry**: Log and track storage temperature (°C), relative humidity (%), storage facility types, and sunlight exposure.
 - **Visual Image Freshness Analysis**: Upload food images to compute 0-100 freshness score, 5-category classification, and spoilage probabilities.
-- **Color & Texture Decomposition**: Quantitative browning index, surface discoloration %, and local GLCM texture roughness scores.
-- **Spoilage Indicators Audit**: Automated detection of color degradation, texture shriveling, mold spot clusters, bruising, and surface cuts.
-- **Inventory Batch Linkage & History**: Attach visual freshness analysis results directly to physical inventory batches and view timeline history.
+- **Predictive Shelf-Life Forecasting**: Compute expected remaining days, estimated expiry date, degradation velocity, risk tier, and trend.
+- **Interactive Storage Inspector**: Simulate environmental changes (temperature, humidity, sunlight) to visualize shelf-life impact in real-time.
+- **Actionable Storage Guidance**: Data-driven recommendations to extend food shelf life and minimize waste.
 - **Printable Inspection Reports**: Generate formal certificates with scores, metrics, timestamps, and model version.
 - **OpenAPI Documentation**: Auto-generated interactive Swagger UI and ReDoc.
 
@@ -67,7 +90,7 @@ ai-food-freshness-monitoring-platform/
 ├── frontend/                  # React + Vite + Tailwind CSS web dashboard
 │   ├── src/
 │   │   ├── components/        # Navbar, Sidebar, StatCard, StatusBadge, Modal, Toast
-│   │   ├── pages/             # Landing, Login, Register, Dashboard, FreshnessAnalysis, FreshnessReport, Inventory, AddItem, Batches, Users, Datasets, Profile, Settings
+│   │   ├── pages/             # Landing, Login, Register, Dashboard, FreshnessAnalysis, ShelfLifePage, FreshnessReport, Inventory, AddItem, Batches, Users, Datasets, Profile, Settings
 │   │   ├── context/           # AuthContext, NotificationContext
 │   │   ├── services/          # API HTTP client
 │   │   └── main.jsx
@@ -80,12 +103,15 @@ ai-food-freshness-monitoring-platform/
 │   │   ├── main.py            # FastAPI entry point & CORS & static uploads
 │   │   ├── core/              # Config, Security (JWT/bcrypt), Permissions (RBAC)
 │   │   ├── database/          # SQLAlchemy session setup
-│   │   ├── ml/                # Computer Vision & ML Pipeline Engine (Preprocessing, Color, Texture, Spoilage, Classifier, Scoring, Predictor)
-│   │   ├── models/            # SQLAlchemy database models (User, FoodItem, Inventory, AnalysisResult)
-│   │   ├── schemas/           # Pydantic schemas (User, FoodItem, Inventory, Freshness)
-│   │   ├── routers/           # Auth, Users, FoodItems, Inventory, Stats, Freshness
+│   │   ├── ml/                # Computer Vision & ML Pipeline & Shelf Life Predictive Engine
+│   │   │   ├── shelf_life_features.py   # Feature extraction & environmental factors
+│   │   │   ├── shelf_life_model.py      # Baseline shelf-life formula & guidance
+│   │   │   └── shelf_life_predictor.py  # Master predictor service
+│   │   ├── models/            # SQLAlchemy database models (User, FoodItem, Inventory, AnalysisResult, StorageCondition, ShelfLifePrediction)
+│   │   ├── schemas/           # Pydantic schemas (User, FoodItem, Inventory, Freshness, StorageCondition, ShelfLifePrediction)
+│   │   ├── routers/           # Auth, Users, FoodItems, Inventory, Stats, Freshness, Storage, ShelfLife
 │   │   └── services/          # Seed demo data service
-│   ├── tests/                 # Pytest test suite (Auth, Users, FoodItems, Inventory, Freshness)
+│   ├── tests/                 # Pytest test suite (Auth, Users, FoodItems, Inventory, Freshness, Shelf Life)
 │   ├── uploads/               # Uploaded food freshness images directory
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -96,15 +122,7 @@ ai-food-freshness-monitoring-platform/
 │   └── evaluation/            # Model performance report (`eval_report.md`)
 │
 ├── datasets/                  # Dataset organization structure
-│   ├── raw/                   # Raw images (fruits, vegetables, food_freshness, food101)
-│   ├── processed/             # Preprocessed data manifests
-│   └── README.md
-│
 ├── docs/                      # Technical documentation
-│   ├── architecture.md
-│   ├── database-schema.md
-│   └── api-documentation.md
-│
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
@@ -124,10 +142,10 @@ cp .env.example .env
 Template contents in `.env.example`:
 
 ```env
-DATABASE_URL=
-SECRET_KEY=
-ACCESS_TOKEN_EXPIRE_MINUTES=
-CORS_ORIGINS=
+DATABASE_URL=postgresql://postgres:azeez%40123@localhost:5432/food_freshness_db
+SECRET_KEY=your-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ---
@@ -164,6 +182,24 @@ docker compose up --build
 
 ---
 
+## Testing
+
+Run backend tests using pytest:
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+Output:
+```text
+tests/test_auth.py PASSED
+tests/test_freshness.py PASSED
+tests/test_shelf_life.py PASSED (21 passed)
+```
+
+---
+
 ## API Documentation
 
 FastAPI provides automatic interactive API documentation accessible when the backend is running:
@@ -171,23 +207,19 @@ FastAPI provides automatic interactive API documentation accessible when the bac
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-### Key Freshness Analysis Endpoints
+### Shelf Life & Storage Endpoints
 
 ```text
-POST   /api/freshness/upload                             Upload image file
-POST   /api/freshness/analyze                            Run complete image analysis pipeline
-GET    /api/freshness/results                            List analysis history
-GET    /api/freshness/results/{analysis_id}              Get detailed analysis result
-DELETE /api/freshness/results/{analysis_id}              Delete analysis result
-GET    /api/inventory/{inventory_id}/freshness-history  Get freshness history for inventory batch
+POST   /api/shelf-life/predict                           Predict remaining shelf life for inventory batch
+GET    /api/shelf-life/inventory/{inventory_id}         Get latest shelf life prediction
+GET    /api/shelf-life/history/{inventory_id}           Get shelf life prediction history
+POST   /api/storage-conditions                            Log storage environmental conditions
+GET    /api/storage-conditions/inventory/{inventory_id} Get storage conditions history
 ```
 
 ---
 
 ## Future Milestones & Roadmap
 
-- **Milestone 3**: Predictive Remaining Shelf-Life Engine & Spoilage Forecast Models.
 - **Milestone 4**: Automated Cold-Storage Sensor Telemetry Streams (IoT integration).
 - **Milestone 5**: Storage Optimization & Smart Waste Reduction Recommendation Engine.
-
----

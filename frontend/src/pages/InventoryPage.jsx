@@ -5,7 +5,7 @@ import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { CATEGORIES, UNITS, PACKAGING_TYPES } from '../utils/constants';
-import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets, History, Sparkles } from 'lucide-react';
+import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets, History, Sparkles, Clock } from 'lucide-react';
 
 export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
   const { user } = useAuth();
@@ -233,6 +233,13 @@ export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
                           title="View Freshness AI History"
                         >
                           <History className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('shelf-life')}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition"
+                          title="Predictive Shelf-Life Forecast"
+                        >
+                          <Clock className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleEditOpen(item)}

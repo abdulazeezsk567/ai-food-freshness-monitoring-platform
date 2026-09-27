@@ -6,7 +6,16 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.database.session import Base, engine, SessionLocal
-from app.routers import auth_router, users_router, food_items_router, inventory_router, stats_router, freshness_router
+from app.routers import (
+    auth_router,
+    users_router,
+    food_items_router,
+    inventory_router,
+    stats_router,
+    freshness_router,
+    storage_router,
+    shelf_life_router
+)
 from app.services.seed import seed_database
 
 # Ensure uploads directory exists
@@ -28,7 +37,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI-powered Food Freshness Monitoring Platform - REST API",
-    version="2.0.0",
+    version="3.0.0",
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan
@@ -53,6 +62,8 @@ app.include_router(food_items_router)
 app.include_router(inventory_router)
 app.include_router(stats_router)
 app.include_router(freshness_router)
+app.include_router(storage_router)
+app.include_router(shelf_life_router)
 
 @app.get("/", tags=["System Overview"])
 def root():
@@ -60,7 +71,7 @@ def root():
         "status": "online",
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT,
-        "version": "2.0.0"
+        "version": "3.0.0"
     }
 
 if __name__ == "__main__":
