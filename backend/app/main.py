@@ -38,8 +38,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="AI-powered Food Freshness Monitoring Platform - REST API",
     version="3.0.0",
-    docs_url=None,
-    redoc_url=None,
+    docs_url="/docs",
+    redoc_url="/redoc",
     lifespan=lifespan
 )
 
