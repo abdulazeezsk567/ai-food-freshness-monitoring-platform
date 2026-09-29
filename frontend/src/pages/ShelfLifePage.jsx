@@ -17,8 +17,10 @@ import {
   TrendingDown, 
   Minus,
   Sparkles,
-  MapPin,
-  FileText
+  Camera,
+  Info,
+  Sliders,
+  Layers
 } from 'lucide-react';
 
 export const ShelfLifePage = ({ initialInventoryId = null }) => {
@@ -30,7 +32,7 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
   const [prediction, setPrediction] = useState(null);
   const [predictionHistory, setPredictionHistory] = useState([]);
 
-  // Storage Condition Form State
+  // Storage Condition Form / What-If Telemetry State
   const [storageForm, setStorageForm] = useState({
     temperature: 4.0,
     humidity: 85.0,
@@ -98,21 +100,26 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
 
     setSavingStorage(true);
     try {
+      // 1. Log updated storage telemetry
       await api.post('/storage-conditions', {
         inventory_id: parseInt(selectedInventoryId),
         ...storageForm
       });
 
-      addToast('Storage conditions updated! Recalculating shelf-life forecast...', 'success');
-
-      // Re-run shelf life prediction with updated storage conditions
+      // 2. Recalculate forecast using backend prediction engine with overrides
       const updatedPred = await api.post('/shelf-life/predict', {
-        inventory_id: parseInt(selectedInventoryId)
+        inventory_id: parseInt(selectedInventoryId),
+        temperature_override: storageForm.temperature,
+        humidity_override: storageForm.humidity,
+        storage_condition_override: storageForm.storage_condition,
+        packaging_type_override: storageForm.packaging_type
       });
 
       setPrediction(updatedPred);
       const updatedHist = await api.get(`/shelf-life/${selectedInventoryId}/history`);
       setPredictionHistory(updatedHist);
+
+      addToast('Storage conditions updated & shelf-life forecast recalculated!', 'success');
     } catch (err) {
       addToast(err.message || 'Failed to update storage conditions', 'error');
     } finally {
@@ -146,11 +153,13 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
           <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
             <Clock className="w-6 h-6 text-emerald-400" /> Predictive Shelf-Life Monitoring
           </h2>
-          <p className="text-xs text-slate-400 mt-1">Multi-factor expiration forecasting based on visual freshness score, storage temperature, humidity, and degradation trends</p>
+          <p className="text-xs text-slate-400 mt-1">Multi-factor baseline expiration forecasting based on category baselines, storage telemetry, packaging, and degradation velocity</p>
         </div>
-        <span className="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
-          Model: shelf-life-baseline-v1 (Active)
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+            Model: shelf-life-baseline-v1
+          </span>
+        </div>
       </div>
 
       {/* Inventory Selector Bar */}
@@ -197,54 +206,75 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
           {/* Main Forecast Metrics & Analysis */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Top Gauges Grid */}
+            {/* Top Forecast Metrics Card */}
             <div className="glass-card p-6 rounded-2xl border border-emerald-500/30 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Shelf-Life Forecast</span>
-                  <h3 className="text-xl font-black text-white">{selectedItem?.food_item?.name || 'Item'} Expiration Forecast</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Shelf-Life Forecast</span>
+                    {prediction.has_image_analysis ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                        <Camera className="w-3 h-3" /> Image-Analysis Assisted
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600/40 flex items-center gap-1">
+                        <Sliders className="w-3 h-3" /> Storage Baseline Only
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-black text-white mt-1">{selectedItem?.food_item?.name || 'Item'} Expiration Forecast</h3>
                 </div>
                 <span className={`px-3 py-1 rounded-xl text-xs font-bold border ${getRiskBadgeColor(prediction.risk_level)}`}>
                   {prediction.risk_level}
                 </span>
               </div>
 
-              {/* 4 Score Cards */}
+              {/* 4 Score Gauges */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="glass-panel p-4 rounded-xl text-center border border-emerald-500/30 bg-emerald-950/20">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Estimated Remaining</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Remaining Shelf Life</span>
                   <div className="text-3xl font-black text-emerald-400">{prediction.estimated_remaining_days} <span className="text-sm font-bold">Days</span></div>
                 </div>
 
                 <div className="glass-panel p-4 rounded-xl text-center border border-cyan-500/30 bg-cyan-950/20">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Estimated Expiry</span>
                   <div className="text-sm font-extrabold text-cyan-300 mt-2">{prediction.estimated_expiry_date}</div>
-                  <span className="text-[9px] text-slate-400 block mt-1">AI Model Estimate</span>
+                  <span className="text-[9px] text-slate-400 block mt-1">Model Estimate</span>
                 </div>
 
                 <div className="glass-panel p-4 rounded-xl text-center border border-purple-500/30 bg-purple-950/20">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Degradation Trend</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Freshness Trend</span>
                   <div className="text-xs font-extrabold text-purple-300 mt-2 flex items-center justify-center gap-1">
                     {getTrendIcon(prediction.trend)} {prediction.trend}
                   </div>
+                  {prediction.degradation_rate_per_day !== null && (
+                    <span className="text-[9px] text-purple-400/80 block mt-1">{prediction.degradation_rate_per_day}/day velocity</span>
+                  )}
                 </div>
 
                 <div className="glass-panel p-4 rounded-xl text-center border border-amber-500/30 bg-amber-950/20">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Model Certainty</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Baseline Confidence</span>
                   <div className="text-3xl font-black text-amber-300">{(prediction.confidence * 100).toFixed(0)}%</div>
+                  <span className="text-[9px] text-slate-400 block mt-1">Heuristic Baseline</span>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 leading-snug">
-                ⚠️ <span className="font-semibold text-slate-300">Important Disclaimer:</span> Estimated remaining shelf life and expiry dates are AI/model-based predictions derived from input features and environmental conditions. They do not constitute guaranteed food-safety certifications.
+              {/* Safety Certification Disclaimer */}
+              <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-amber-200/90 leading-snug flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">AI/Model Estimate — Not a Food Safety Certification:</span> Estimated remaining shelf life and expiration dates are calculated using a deterministic baseline formula (`shelf-life-baseline-v1`) derived from storage telemetry and visual features.
+                </div>
               </div>
             </div>
 
-            {/* Storage Impact Analysis */}
-            <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 text-xs">
+            {/* Storage Condition Impact Factors Decomposition */}
+            <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4 text-xs">
               <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                🌡️ Storage Condition Impact Analysis
+                🌡️ Multi-Factor Model Impact Decomposition
               </h3>
+
+              {/* Observations list */}
               <div className="space-y-2 text-slate-300">
                 {prediction.storage_impact?.observations?.map((obs, idx) => (
                   <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300 flex items-start gap-2">
@@ -254,23 +284,35 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                 ))}
               </div>
 
-              {/* Factors Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-center text-[11px]">
-                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-                  <span className="text-slate-500 block">Temp Factor</span>
-                  <span className="font-bold text-white">{prediction.storage_impact?.temperature_factor}x</span>
+              {/* 7 Factor Multipliers Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-[11px]">
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Temp Factor</span>
+                  <span className="font-bold text-emerald-400 text-sm">{prediction.storage_impact?.temperature_factor}x</span>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-                  <span className="text-slate-500 block">Humidity Factor</span>
-                  <span className="font-bold text-white">{prediction.storage_impact?.humidity_factor}x</span>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Humidity Factor</span>
+                  <span className="font-bold text-emerald-400 text-sm">{prediction.storage_impact?.humidity_factor}x</span>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-                  <span className="text-slate-500 block">Packaging Factor</span>
-                  <span className="font-bold text-white">{prediction.storage_impact?.packaging_factor}x</span>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Packaging Factor</span>
+                  <span className="font-bold text-emerald-400 text-sm">{prediction.storage_impact?.packaging_factor}x</span>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-                  <span className="text-slate-500 block">Condition Factor</span>
-                  <span className="font-bold text-white">{prediction.storage_impact?.condition_factor}x</span>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Condition Factor</span>
+                  <span className="font-bold text-emerald-400 text-sm">{prediction.storage_impact?.condition_factor}x</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Freshness Factor</span>
+                  <span className="font-bold text-purple-400 text-sm">{prediction.storage_impact?.freshness_factor}x</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Spoilage Factor</span>
+                  <span className="font-bold text-purple-400 text-sm">{prediction.storage_impact?.spoilage_factor}x</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 sm:col-span-2">
+                  <span className="text-slate-500 block font-semibold text-[10px] uppercase">Trend Velocity Factor</span>
+                  <span className="font-bold text-cyan-400 text-sm">{prediction.storage_impact?.trend_factor}x</span>
                 </div>
               </div>
             </div>
@@ -278,7 +320,7 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
             {/* Storage Guidance Recommendations */}
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 text-xs">
               <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                📋 Basic Storage Guidance & Action Items
+                📋 Actionable Storage Guidance
               </h3>
               <div className="space-y-2">
                 {prediction.storage_guidance?.map((item, idx) => (
@@ -293,15 +335,18 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
             {/* Prediction History Table */}
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3 text-xs">
               <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                📜 Prediction History Log
+                📜 Prediction Audit Log History
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {predictionHistory.length > 0 ? (
                   predictionHistory.map((p) => (
                     <div key={p.id} className="p-3 rounded-xl border border-slate-800 bg-slate-900/40 flex items-center justify-between gap-3">
                       <div>
-                        <span className="font-bold text-white">{p.estimated_remaining_days} Remaining Days</span>
-                        <span className="text-[10px] text-slate-400 block">Expiry: {p.estimated_expiry_date} ({new Date(p.created_at).toLocaleDateString()})</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{p.estimated_remaining_days} Remaining Days</span>
+                          <span className="text-[10px] text-slate-400">({(p.confidence * 100).toFixed(0)}% Baseline Conf)</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">Expiry: {p.estimated_expiry_date} • {new Date(p.created_at).toLocaleString()}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRiskBadgeColor(p.risk_level)}`}>
@@ -318,12 +363,15 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
 
           </div>
 
-          {/* Storage Telemetry Input Form Column */}
+          {/* Storage Telemetry & What-If Form Column */}
           <div className="lg:col-span-5 space-y-6">
             <form onSubmit={handleStorageSubmit} className="glass-card p-6 rounded-2xl border border-slate-800 space-y-5">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Thermometer className="w-4 h-4 text-cyan-400" /> Log Storage Telemetry
-              </h3>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Thermometer className="w-4 h-4 text-cyan-400" /> Storage Telemetry & What-If Simulator
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400">Modify temperature, humidity, storage environment, or packaging format to dynamically recalculate the shelf-life prediction using the backend model engine.</p>
 
               {/* Temperature */}
               <div>
@@ -333,11 +381,14 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                 <input
                   type="number"
                   step="0.1"
+                  min="-30"
+                  max="60"
                   value={storageForm.temperature}
-                  onChange={(e) => setStorageForm({ ...storageForm, temperature: parseFloat(e.target.value) })}
+                  onChange={(e) => setStorageForm({ ...storageForm, temperature: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500"
                   required
                 />
+                <span className="text-[10px] text-slate-500 mt-1 block">Valid range: -30.0°C to 60.0°C</span>
               </div>
 
               {/* Humidity */}
@@ -348,14 +399,17 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                 <input
                   type="number"
                   step="0.1"
+                  min="0"
+                  max="100"
                   value={storageForm.humidity}
-                  onChange={(e) => setStorageForm({ ...storageForm, humidity: parseFloat(e.target.value) })}
+                  onChange={(e) => setStorageForm({ ...storageForm, humidity: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500"
                   required
                 />
+                <span className="text-[10px] text-slate-500 mt-1 block">Valid range: 0.0% to 100.0%</span>
               </div>
 
-              {/* Storage Condition */}
+              {/* Storage Condition Environment */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                   Storage Condition Environment *
@@ -383,14 +437,14 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                   value={storageForm.storage_location}
                   onChange={(e) => setStorageForm({ ...storageForm, storage_location: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500"
-                  placeholder="e.g. Cold Vault 2"
+                  placeholder="e.g. Cold Room Vault B"
                 />
               </div>
 
-              {/* Packaging Type */}
+              {/* Packaging Format */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Packaging Format
+                  Packaging Format *
                 </label>
                 <select
                   value={storageForm.packaging_type}
@@ -407,7 +461,7 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                 </select>
               </div>
 
-              {/* Submit Button */}
+              {/* Recalculate Submit Button */}
               <button
                 type="submit"
                 disabled={savingStorage}
@@ -419,7 +473,7 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" /> Save Telemetry & Recalculate Forecast
+                    <Sparkles className="w-4 h-4" /> Recalculate & Save Telemetry
                   </>
                 )}
               </button>

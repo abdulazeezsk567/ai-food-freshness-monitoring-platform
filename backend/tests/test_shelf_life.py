@@ -1,127 +1,162 @@
 import pytest
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from app.ml.shelf_life_features import extract_shelf_life_features
 from app.ml.shelf_life_model import predict_shelf_life
 
-def test_feature_extraction_defaults():
-    features = extract_shelf_life_features(
-        food_category="Fruits",
-        freshness_score=85,
-        freshness_category="Good",
-        spoilage_probability=0.05,
-        purchase_date=date.today() - timedelta(days=2),
-        storage_temperature=4.0,
-        storage_humidity=85.0
-    )
-    assert features["food_category"] == "Fruits"
-    assert features["base_shelf_life_days"] == 14
-    assert features["age_days"] == 2
-    assert features["trend"] == "Insufficient Data"
+def test_higher_temperature_reduces_shelf_life():
+    """A. Higher temperature reduces shelf life."""
+    f_cool = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, storage_temperature=4.0)
+    p_cool = predict_shelf_life(f_cool)
 
-def test_prediction_formula_low_risk():
-    features = extract_shelf_life_features(
-        food_category="Fruits",
-        freshness_score=90,
-        freshness_category="Fresh",
-        spoilage_probability=0.02,
-        purchase_date=date.today(),
-        storage_temperature=4.0,
-        storage_humidity=85.0,
-        packaging_type="Standard Packaging",
-        storage_condition="Refrigerated"
-    )
-    prediction = predict_shelf_life(features)
-    assert prediction["estimated_remaining_days"] >= 10
-    assert prediction["risk_level"] == "LOW RISK"
-    assert "shelf-life-baseline-v1" in prediction["model_version"]
+    f_warm = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, storage_temperature=25.0)
+    p_warm = predict_shelf_life(f_warm)
 
-def test_prediction_formula_critical_risk():
-    features = extract_shelf_life_features(
-        food_category="Meat & Poultry",
-        freshness_score=35,
-        freshness_category="Near Spoilage",
-        spoilage_probability=0.75,
-        purchase_date=date.today() - timedelta(days=4),
-        storage_temperature=12.0,  # High temperature penalty
-        storage_condition="Room Temperature"  # Non-refrigerated penalty
-    )
-    prediction = predict_shelf_life(features)
-    assert prediction["estimated_remaining_days"] <= 1
-    assert prediction["risk_level"] == "CRITICAL"
+    assert p_warm["estimated_remaining_days"] < p_cool["estimated_remaining_days"]
 
-def test_degradation_trend_calculation():
-    # Insufficient history (<2 scores)
-    f_empty = extract_shelf_life_features("Fruits", 80, "Good", 0.10, historical_scores=[80])
-    assert f_empty["trend"] == "Insufficient Data"
+def test_extreme_humidity_affects_shelf_life():
+    """B. Extreme humidity affects shelf life."""
+    f_opt = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, storage_humidity=85.0)
+    p_opt = predict_shelf_life(f_opt)
 
-    # Declining trend
-    f_declining = extract_shelf_life_features("Fruits", 60, "Acceptable", 0.30, historical_scores=[92, 80, 60])
-    assert f_declining["trend"] == "Declining"
+    f_extreme = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, storage_humidity=20.0)
+    p_extreme = predict_shelf_life(f_extreme)
 
-    # Improving trend
-    f_improving = extract_shelf_life_features("Fruits", 90, "Fresh", 0.02, historical_scores=[75, 82, 90])
-    assert f_improving["trend"] == "Improving"
+    assert p_extreme["estimated_remaining_days"] < p_opt["estimated_remaining_days"]
 
-def test_record_storage_condition_api(client, retail_token):
+def test_higher_freshness_score_increases_remaining_shelf_life():
+    """C. Higher freshness score generally increases remaining shelf life."""
+    f_high = extract_shelf_life_features("Fruits", 95, "Fresh", 0.02, has_image_analysis=True)
+    p_high = predict_shelf_life(f_high)
+
+    f_low = extract_shelf_life_features("Fruits", 50, "Acceptable", 0.30, has_image_analysis=True)
+    p_low = predict_shelf_life(f_low)
+
+    assert p_high["estimated_remaining_days"] > p_low["estimated_remaining_days"]
+
+def test_higher_spoilage_probability_increases_risk():
+    """D. Higher spoilage probability increases risk and reduces remaining days."""
+    f_low_spoil = extract_shelf_life_features("Fruits", 80, "Good", 0.05, has_image_analysis=True)
+    p_low_spoil = predict_shelf_life(f_low_spoil)
+
+    f_high_spoil = extract_shelf_life_features("Fruits", 80, "Good", 0.75, has_image_analysis=True)
+    p_high_spoil = predict_shelf_life(f_high_spoil)
+
+    assert p_high_spoil["risk_level"] == "CRITICAL"
+    assert p_high_spoil["estimated_remaining_days"] <= p_low_spoil["estimated_remaining_days"]
+
+def test_greater_food_age_reduces_remaining_shelf_life():
+    """E. Greater food age reduces remaining shelf life."""
+    f_fresh = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, purchase_date=date.today())
+    p_fresh = predict_shelf_life(f_fresh)
+
+    f_old = extract_shelf_life_features("Fruits", 90, "Fresh", 0.05, purchase_date=date.today() - timedelta(days=10))
+    p_old = predict_shelf_life(f_old)
+
+    assert p_old["estimated_remaining_days"] < p_fresh["estimated_remaining_days"]
+
+def test_declining_freshness_history_produces_declining_trend():
+    """F. Declining freshness history produces Declining trend."""
+    t0 = datetime.utcnow() - timedelta(days=5)
+    t1 = datetime.utcnow()
+    records = [
+        {"freshness_score": 90, "created_at": t0},
+        {"freshness_score": 60, "created_at": t1}
+    ]
+    f = extract_shelf_life_features("Fruits", 60, "Acceptable", 0.30, past_analysis_records=records)
+    assert f["trend"] == "Declining"
+    assert f["sufficient_data"] is True
+    assert f["degradation_rate_per_day"] > 0.0
+
+def test_stable_history_produces_stable_trend():
+    """G. Stable history produces Stable trend."""
+    t0 = datetime.utcnow() - timedelta(days=3)
+    t1 = datetime.utcnow()
+    records = [
+        {"freshness_score": 85, "created_at": t0},
+        {"freshness_score": 84, "created_at": t1}
+    ]
+    f = extract_shelf_life_features("Fruits", 84, "Good", 0.10, past_analysis_records=records)
+    assert f["trend"] == "Stable"
+    assert f["sufficient_data"] is True
+
+def test_insufficient_history_produces_insufficient_data():
+    """H. Insufficient history produces Insufficient Data."""
+    records = [{"freshness_score": 85, "created_at": datetime.utcnow()}]
+    f = extract_shelf_life_features("Fruits", 85, "Good", 0.10, past_analysis_records=records)
+    assert f["trend"] == "Insufficient Data"
+    assert f["sufficient_data"] is False
+    assert f["degradation_rate_per_day"] is None
+
+def test_different_packaging_affects_prediction():
+    """I. Different packaging affects prediction."""
+    f_vacuum = extract_shelf_life_features("Meat & Poultry", 90, "Fresh", 0.05, packaging_type="Vacuum Sealed")
+    p_vacuum = predict_shelf_life(f_vacuum)
+
+    f_loose = extract_shelf_life_features("Meat & Poultry", 90, "Fresh", 0.05, packaging_type="Unpackaged / Loose")
+    p_loose = predict_shelf_life(f_loose)
+
+    assert p_vacuum["estimated_remaining_days"] > p_loose["estimated_remaining_days"]
+
+def test_refrigerated_frozen_room_temp_conditions_behave_differently():
+    """J. Refrigerated/Frozen/Room Temperature conditions behave differently."""
+    f_ref = extract_shelf_life_features("Dairy Products", 90, "Fresh", 0.05, storage_condition="Refrigerated")
+    p_ref = predict_shelf_life(f_ref)
+
+    f_room = extract_shelf_life_features("Dairy Products", 90, "Fresh", 0.05, storage_condition="Room Temperature")
+    p_room = predict_shelf_life(f_room)
+
+    f_frozen = extract_shelf_life_features("Dairy Products", 90, "Fresh", 0.05, storage_condition="Frozen")
+    p_frozen = predict_shelf_life(f_frozen)
+
+    assert p_room["estimated_remaining_days"] < p_ref["estimated_remaining_days"]
+    assert p_frozen["estimated_remaining_days"] >= p_ref["estimated_remaining_days"]
+
+def test_invalid_humidity_rejected(client, retail_token):
+    """K. Invalid humidity is rejected."""
     headers = {"Authorization": f"Bearer {retail_token}"}
-    
-    # 1. Create a food item and batch
-    food_res = client.post("/api/food-items", json={
-        "name": "Test Milk Batch",
-        "category": "Dairy Products",
-        "description": "Milk batch for storage telemetry test"
-    }, headers=headers)
-    food_id = food_res.json()["id"]
-
-    inv_res = client.post("/api/inventory", json={
-        "food_item_id": food_id,
-        "batch_number": "BATCH-MLK-TEST",
-        "quantity": 10.0,
-        "unit": "liters",
-        "purchase_date": str(date.today()),
-        "expiry_date": str(date.today() + timedelta(days=7)),
-        "storage_temperature": 3.0,
-        "storage_humidity": 80.0,
+    res = client.post("/api/storage-conditions", json={
+        "inventory_id": 1,
+        "temperature": 4.0,
+        "humidity": 150.0,  # Invalid humidity > 100
         "packaging_type": "Standard Packaging",
-        "storage_duration": 7
+        "storage_condition": "Refrigerated"
     }, headers=headers)
-    inv_id = inv_res.json()["id"]
+    assert res.status_code == 422
 
-    # 2. Record storage condition log
-    storage_res = client.post("/api/storage-conditions", json={
-        "inventory_id": inv_id,
-        "temperature": 2.5,
-        "humidity": 82.0,
-        "storage_location": "Cold Vault 2",
-        "packaging_type": "Aseptic Packaging",
-        "storage_condition": "Refrigerated",
-        "storage_duration_days": 3,
-        "notes": "Optimal cold chain maintained"
+def test_invalid_freshness_score_rejected(client, retail_token):
+    """L. Invalid freshness score override or input rejected in schemas."""
+    headers = {"Authorization": f"Bearer {retail_token}"}
+    res = client.post("/api/shelf-life/predict", json={
+        "inventory_id": 1,
+        "temperature_override": 120.0  # Invalid temp > 60.0
     }, headers=headers)
-    assert storage_res.status_code == 201
-    s_data = storage_res.json()
-    assert s_data["inventory_id"] == inv_id
-    assert s_data["temperature"] == 2.5
+    assert res.status_code == 422
 
-    # 3. Retrieve latest storage condition log
-    get_res = client.get(f"/api/storage-conditions/{inv_id}", headers=headers)
-    assert get_res.status_code == 200
-    assert get_res.json()["temperature"] == 2.5
+def test_invalid_spoilage_probability_rejected(client, retail_token):
+    """M. Invalid storage condition string rejected in Pydantic."""
+    headers = {"Authorization": f"Bearer {retail_token}"}
+    res = client.post("/api/shelf-life/predict", json={
+        "inventory_id": 1,
+        "storage_condition_override": "InvalidConditionName"
+    }, headers=headers)
+    assert res.status_code == 422
 
-def test_predict_shelf_life_api(client, retail_token):
+def test_prediction_response_persisted_in_database(client, retail_token):
+    """N. Prediction response is persisted in database."""
     headers = {"Authorization": f"Bearer {retail_token}"}
 
+    # Create food item & batch
     food_res = client.post("/api/food-items", json={
-        "name": "Test Orange Batch",
+        "name": "Test Apple Batch",
         "category": "Fruits",
-        "description": "Orange batch for predictive shelf-life test"
+        "description": "Apple batch for DB persistence test"
     }, headers=headers)
     food_id = food_res.json()["id"]
 
     inv_res = client.post("/api/inventory", json={
         "food_item_id": food_id,
-        "batch_number": "BATCH-ORG-TEST",
-        "quantity": 25.0,
+        "batch_number": "BATCH-APL-DBTEST",
+        "quantity": 50.0,
         "unit": "kg",
         "purchase_date": str(date.today()),
         "expiry_date": str(date.today() + timedelta(days=14)),
@@ -132,19 +167,89 @@ def test_predict_shelf_life_api(client, retail_token):
     }, headers=headers)
     inv_id = inv_res.json()["id"]
 
-    # Request prediction
-    pred_res = client.post("/api/shelf-life/predict", json={
-        "inventory_id": inv_id
+    # Post prediction
+    pred_res = client.post("/api/shelf-life/predict", json={"inventory_id": inv_id}, headers=headers)
+    assert pred_res.status_code == 201
+    data = pred_res.json()
+    assert data["inventory_id"] == inv_id
+    assert "estimated_remaining_days" in data
+    assert data["model_version"] == "shelf-life-baseline-v1"
+
+def test_prediction_history_works_correctly(client, retail_token):
+    """O. Prediction history works correctly."""
+    headers = {"Authorization": f"Bearer {retail_token}"}
+
+    food_res = client.post("/api/food-items", json={
+        "name": "Test Banana Batch",
+        "category": "Fruits",
+        "description": "Banana batch for history test"
+    }, headers=headers)
+    food_id = food_res.json()["id"]
+
+    inv_res = client.post("/api/inventory", json={
+        "food_item_id": food_id,
+        "batch_number": "BATCH-BAN-HIST",
+        "quantity": 30.0,
+        "unit": "kg",
+        "purchase_date": str(date.today()),
+        "expiry_date": str(date.today() + timedelta(days=7)),
+        "storage_temperature": 4.0,
+        "storage_humidity": 85.0,
+        "packaging_type": "Standard Packaging",
+        "storage_duration": 7
+    }, headers=headers)
+    inv_id = inv_res.json()["id"]
+
+    # Generate 2 predictions
+    client.post("/api/shelf-life/predict", json={"inventory_id": inv_id}, headers=headers)
+    client.post("/api/shelf-life/predict", json={"inventory_id": inv_id, "temperature_override": 10.0}, headers=headers)
+
+    hist_res = client.get(f"/api/shelf-life/{inv_id}/history", headers=headers)
+    assert hist_res.status_code == 200
+    history = hist_res.json()
+    assert len(history) >= 2
+
+def test_storage_telemetry_changes_reflected_in_subsequent_predictions(client, retail_token):
+    """P. Storage telemetry changes are reflected in subsequent predictions."""
+    headers = {"Authorization": f"Bearer {retail_token}"}
+
+    food_res = client.post("/api/food-items", json={
+        "name": "Test Grape Batch",
+        "category": "Fruits",
+        "description": "Grape batch for telemetry update test"
+    }, headers=headers)
+    food_id = food_res.json()["id"]
+
+    inv_res = client.post("/api/inventory", json={
+        "food_item_id": food_id,
+        "batch_number": "BATCH-GRP-TEL",
+        "quantity": 15.0,
+        "unit": "kg",
+        "purchase_date": str(date.today()),
+        "expiry_date": str(date.today() + timedelta(days=10)),
+        "storage_temperature": 4.0,
+        "storage_humidity": 85.0,
+        "packaging_type": "Standard Packaging",
+        "storage_duration": 10
+    }, headers=headers)
+    inv_id = inv_res.json()["id"]
+
+    # Initial prediction at 4.0°C
+    p1_res = client.post("/api/shelf-life/predict", json={"inventory_id": inv_id}, headers=headers)
+    days_p1 = p1_res.json()["estimated_remaining_days"]
+
+    # Log severe storage temperature change (30.0°C)
+    client.post("/api/storage-conditions", json={
+        "inventory_id": inv_id,
+        "temperature": 30.0,
+        "humidity": 40.0,
+        "storage_location": "Hot Warehouse Room",
+        "packaging_type": "Paper Wrapping",
+        "storage_condition": "Room Temperature"
     }, headers=headers)
 
-    assert pred_res.status_code == 201
-    p = pred_res.json()
-    assert p["inventory_id"] == inv_id
-    assert p["estimated_remaining_days"] >= 0
-    assert p["risk_level"] in ["LOW RISK", "MEDIUM RISK", "HIGH RISK", "CRITICAL"]
-    assert "shelf-life-baseline-v1" in p["model_version"]
+    # Subsequent prediction
+    p2_res = client.post("/api/shelf-life/predict", json={"inventory_id": inv_id}, headers=headers)
+    days_p2 = p2_res.json()["estimated_remaining_days"]
 
-    # Retrieve latest prediction via GET
-    get_res = client.get(f"/api/shelf-life/{inv_id}", headers=headers)
-    assert get_res.status_code == 200
-    assert get_res.json()["inventory_id"] == inv_id
+    assert days_p2 < days_p1

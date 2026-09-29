@@ -22,6 +22,11 @@ def prepare_shelf_life_response(record: ShelfLifePrediction) -> ShelfLifePredict
     storage_guidance_val = json.loads(record.storage_guidance) if isinstance(record.storage_guidance, str) else record.storage_guidance
     input_features_val = json.loads(record.input_features) if isinstance(record.input_features, str) else record.input_features
 
+    has_image_analysis = input_features_val.get("has_image_analysis", record.analysis_id is not None)
+    has_storage_log = input_features_val.get("has_storage_log", False)
+    degradation_rate_per_day = input_features_val.get("degradation_rate_per_day")
+    sufficient_data = input_features_val.get("sufficient_data", False)
+
     return ShelfLifePredictionResponse(
         id=record.id,
         inventory_id=record.inventory_id,
@@ -32,6 +37,10 @@ def prepare_shelf_life_response(record: ShelfLifePrediction) -> ShelfLifePredict
         risk_level=record.risk_level,
         confidence=record.confidence,
         trend=record.trend,
+        has_image_analysis=has_image_analysis,
+        has_storage_log=has_storage_log,
+        degradation_rate_per_day=degradation_rate_per_day,
+        sufficient_data=sufficient_data,
         storage_impact=storage_impact_val,
         contributing_factors=contributing_factors_val,
         storage_guidance=storage_guidance_val,
@@ -53,7 +62,7 @@ def generate_shelf_life_prediction(
             detail=f"Inventory batch #{data.inventory_id} not found."
         )
 
-    # 1. Fetch latest image analysis for this inventory batch
+    # 1. Fetch image analysis for this inventory batch
     analysis = None
     if data.analysis_id:
         analysis = db.query(AnalysisResult).filter(AnalysisResult.id == data.analysis_id).first()
@@ -62,15 +71,18 @@ def generate_shelf_life_prediction(
             AnalysisResult.inventory_id == data.inventory_id
         ).order_by(AnalysisResult.created_at.desc()).first()
 
-    # Default fallback values if no image analysis has been performed yet
-    freshness_score = analysis.freshness_score if analysis else 85
+    # Explicit image analysis identification (no silent fallbacks pretending image analysis exists)
+    has_image_analysis = analysis is not None
+    freshness_score = analysis.freshness_score if analysis else 100
     freshness_category = analysis.predicted_category if analysis else "Good"
-    spoilage_prob = analysis.spoilage_probability if analysis else 0.08
+    spoilage_prob = analysis.spoilage_probability if analysis else 0.0
 
     # 2. Fetch latest storage condition record
     latest_storage = db.query(StorageCondition).filter(
         StorageCondition.inventory_id == data.inventory_id
     ).order_by(StorageCondition.created_at.desc()).first()
+
+    has_storage_log = latest_storage is not None
 
     storage_temp = data.temperature_override if data.temperature_override is not None else (
         latest_storage.temperature if latest_storage else inv.storage_temperature
@@ -78,18 +90,26 @@ def generate_shelf_life_prediction(
     storage_hum = data.humidity_override if data.humidity_override is not None else (
         latest_storage.humidity if latest_storage else inv.storage_humidity
     )
-    storage_cond = data.storage_condition_override if data.storage_condition_override else (
+    storage_cond = data.storage_condition_override if data.storage_condition_override is not None else (
         latest_storage.storage_condition if latest_storage else "Refrigerated"
     )
-    packaging = latest_storage.packaging_type if latest_storage else inv.packaging_type
+    packaging = data.packaging_type_override if data.packaging_type_override is not None else (
+        latest_storage.packaging_type if latest_storage else inv.packaging_type
+    )
     duration_days = latest_storage.storage_duration_days if latest_storage else inv.storage_duration
 
-    # 3. Fetch historical image analysis scores for trend analysis
+    # 3. Fetch past image analyses for timestamp-based degradation velocity
     past_analyses = db.query(AnalysisResult).filter(
         AnalysisResult.inventory_id == data.inventory_id
     ).order_by(AnalysisResult.created_at.asc()).all()
 
-    historical_scores = [a.freshness_score for a in past_analyses]
+    past_records = [
+        {
+            "freshness_score": a.freshness_score,
+            "created_at": a.created_at
+        }
+        for a in past_analyses
+    ]
 
     # 4. Execute Predictive Model Engine
     food_category = inv.food_item.category if inv.food_item else "Fruits"
@@ -98,13 +118,15 @@ def generate_shelf_life_prediction(
         freshness_score=freshness_score,
         freshness_category=freshness_category,
         spoilage_probability=spoilage_prob,
+        has_image_analysis=has_image_analysis,
+        has_storage_log=has_storage_log,
         purchase_date=inv.purchase_date,
         storage_temperature=storage_temp,
         storage_humidity=storage_hum,
         packaging_type=packaging,
         storage_condition=storage_cond,
         storage_duration_days=duration_days,
-        historical_scores=historical_scores
+        past_analysis_records=past_records
     )
 
     expiry_date_val = datetime.strptime(prediction_dict["estimated_expiry_date"], "%Y-%m-%d").date()
