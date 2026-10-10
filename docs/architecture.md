@@ -1,84 +1,151 @@
 # Food Freshness Monitoring Platform - System Architecture
 
-This document describes the high-level architecture, module dependencies, role-based security layer, and database integrations for the Food Freshness Monitoring Platform (Milestone 1).
+This document describes the high-level architecture, module dependencies, data flow, computer vision pipeline, predictive shelf-life engine, role-based security layer, and containerized deployment for the **AI-Powered Food Freshness Detection and Predictive Shelf Life Monitoring Platform** (Milestones 1–4).
 
-## 1. System Overview
+---
 
-The Food Freshness Monitoring Platform is a full-stack web platform built for tracking food inventory, storage environmental parameters, batch metadata, and freshness status across consumers, retail managers, warehouse operators, food quality inspectors, and system administrators.
+## 1. System Overview & Component Diagram
 
 ```text
-+-----------------------------------------------------------------------+
-|                             REACT FRONTEND                            |
-|  (Vite + Tailwind CSS + Lucide Icons + Axios / Fetch + Auth Context) |
-+-----------------------------------------------------------------------+
-                                   |
-                                   | REST API (JSON / HTTP Bearer JWT)
-                                   v
-+-----------------------------------------------------------------------+
-|                            FASTAPI BACKEND                            |
-|                                                                       |
-|  +---------------------+  +---------------------+  +---------------+  |
-|  |     Auth Router     |  |    Users Router     |  | Food Router   |  |
-|  | (/api/auth/login...) |  |   (/api/users...)   |  | (/api/food...) |  |
-|  +---------------------+  +---------------------+  +---------------+  |
-|                                                                       |
-|  +---------------------+  +---------------------+  +---------------+  |
-|  |  Inventory Router   |  |    Stats Router     |  | AI Stubs Svc  |  |
-|  |  (/api/inventory..) |  |   (/api/stats...)   |  | (Future M2/3) |  |
-|  +---------------------+  +---------------------+  +---------------+  |
-|                                                                       |
-|  +-----------------------------------------------------------------+  |
-|  |          Security Layer (Passlib / bcrypt + PyJWT RBAC)        |  |
-|  +-----------------------------------------------------------------+  |
-|                                                                       |
-|  +-----------------------------------------------------------------+  |
-|  |                   SQLAlchemy ORM Data Engine                    |  |
-|  +-----------------------------------------------------------------+  |
-+-----------------------------------------------------------------------+
-                                   |
-                 +-----------------+-----------------+
-                 |                                   |
-                 v                                   v
-    +-------------------------+         +-------------------------+
-    |       POSTGRESQL        |         |     SQLITE FALLBACK     |
-    | (Docker / Prod Database)|         |  (Local Dev & Testing)  |
-    +-------------------------+         +-------------------------+
++-----------------------------------------------------------------------------------------+
+|                                    CLIENT APPLICATION                                   |
+|                React 18 + Vite + Tailwind CSS + Lucide Icons + SPA Router                |
++-----------------------------------------------------------------------------------------+
+                                             |
+                                             | HTTP / JSON / Multipart (JWT Bearer Auth)
+                                             v
++-----------------------------------------------------------------------------------------+
+|                                  NGINX REVERSE PROXY                                    |
+|         Port 80 / 5173 ──> /api/ ──> Backend:8000 | /uploads/ ──> Backend:8000          |
++-----------------------------------------------------------------------------------------+
+                                             |
+                                             v
++-----------------------------------------------------------------------------------------+
+|                                    FASTAPI BACKEND                                      |
+|                                                                                         |
+|  +-------------------+  +-------------------+  +-------------------+  +---------------+ |
+|  |    Auth Router    |  |   Users Router    |  | Food Items Router |  | Inventory Rtr | |
+|  | (/api/auth)       |  | (/api/users)      |  | (/api/food-items) |  | (/api/invent.)| |
+|  +-------------------+  +-------------------+  +-------------------+  +---------------+ |
+|                                                                                         |
+|  +-------------------+  +-------------------+  +-------------------+  +---------------+ |
+|  |  Freshness Router |  | Storage / IoT Rtr |  |  Shelf-Life Rtr   |  | Reports Router| |
+|  | (/api/freshness)  |  | (/api/storage)    |  | (/api/shelf-life) |  | (/api/reports)| |
+|  +-------------------+  +-------------------+  +-------------------+  +---------------+ |
+|                                                                                         |
+|  +------------------------------------------------------------------------------------+ |
+|  |                                Stats & Analytics Router                            | |
+|  |  Real database aggregates, facility telemetry, CV distribution, spoilage alerts    | |
+|  +------------------------------------------------------------------------------------+ |
+|                                                                                         |
+|  +------------------------------------------------------------------------------------+ |
+|  |                                   AI & ML ENGINES                                  | |
+|  |  [Computer Vision Pipeline]                     [Predictive Shelf-Life Engine]     | |
+|  |  • Preprocessing & Blur Detection               • shelf-life-baseline-v1           | |
+|  |  • Browning Index & HSV/LAB color               • Multi-factor decay formula       | |
+|  |  • GLCM texture homogeneity                     • Timestamp degradation velocity   | |
+|  |  • Spoilage indicator identification            • Transparent heuristic confidence | |
+|  +------------------------------------------------------------------------------------+ |
+|                                                                                         |
+|  +------------------------------------------------------------------------------------+ |
+|  |                    Security Layer (Passlib / bcrypt + PyJWT RBAC)                  | |
+|  +------------------------------------------------------------------------------------+ |
+|                                                                                         |
+|  +------------------------------------------------------------------------------------+ |
+|  |                             SQLAlchemy ORM Data Engine                             | |
+|  +------------------------------------------------------------------------------------+ |
++-----------------------------------------------------------------------------------------+
+                                             |
+                      +----------------------+----------------------+
+                      |                                             |
+                      v                                             v
+        +---------------------------+                 +---------------------------+
+        |        POSTGRESQL         |                 |      SQLITE FALLBACK      |
+        |  (Production / Docker)    |                 |   (Local Dev & Pytest)    |
+        +---------------------------+                 +---------------------------+
+                      |
+                      v
+        +---------------------------+
+        |  DOCKER PERSISTENT VOLS   |
+        |  • postgres_data          |
+        |  • uploads_data           |
+        +---------------------------+
 ```
 
 ---
 
-## 2. Security & Role-Based Access Control (RBAC)
+## 2. Computer Vision Freshness Pipeline (Milestone 2)
 
-The system defines 5 roles with distinct privilege boundaries:
+The CV module (`backend/app/ml/`) extracts physical visual degradation metrics directly from uploaded food inspection images:
+
+```text
+[Input Image: JPG / PNG / WEBP]
+        │
+        ├──> [Preprocessing & Standardization] (Resizing, Laplacian blur verification)
+        │
+        ├──> [Color Analysis] ──> RGB to HSV & LAB color spaces
+        │                        ├──> Browning Index (BI) calculation
+        │                        └──> Surface discoloration ratio
+        │
+        ├──> [Texture Analysis] ──> Grayscale GLCM (Gray-Level Co-occurrence Matrix)
+        │                          ├──> Homogeneity & contrast metrics
+        │                          └──> Laplacian gradient variance
+        │
+        ├──> [Defect & Spoilage Indicators]
+        │    ├── Color Degradation Detection
+        │    ├── Surface Texture Irregularity
+        │    ├── Mold Spot / Dark Patch Segmentation
+        │    └── Bruising / Physical Soft Spot Estimation
+        │
+        └──> [Freshness Classification & Scoring]
+             ├── 5-Category Classification (Fresh, Good, Acceptable, Near Spoilage, Spoiled)
+             ├── Transparent 0–100 Freshness Score
+             └── Spoilage Probability: P(Near Spoilage) + P(Spoiled)
+```
+
+---
+
+## 3. Predictive Shelf-Life Engine: `shelf-life-baseline-v1` (Milestone 3)
+
+The remaining shelf life is computed via a transparent, multi-factor deterministic baseline formula:
+
+$$\text{Remaining Shelf Life} = \max\left(0, \left(\text{Base Days} \times F_{\text{fresh}} \times F_{\text{spoil}} \times F_{\text{temp}} \times F_{\text{humidity}} \times F_{\text{pkg}} \times F_{\text{cond}} \times F_{\text{trend}}\right) - \text{Age}\right)$$
+
+### Key Components:
+- **Baseline Days**: Food item category baselines (Fruits: 14d, Vegetables: 10d, Dairy: 7d, Meat & Poultry: 5d, Seafood: 3d, Bakery: 4d, Beverages: 30d, Pantry: 90d).
+- **Assisted vs. Baseline Mode**: Accurately flags whether an assessment is assisted by visual computer vision (`has_image_analysis: true`) or derived strictly from inventory and storage telemetry (`has_image_analysis: false`).
+- **Degradation Velocity ($\Delta \text{Score} / \Delta t$)**: Uses actual historical inspection timestamps to calculate score decay per elapsed day, returning trajectory states (`Declining`, `Stable`, `Improving`, or `Insufficient Data`).
+- **Transparent Heuristic Confidence**: Statistically uncalibrated fixed values are strictly avoided; confidence is deterministically calculated from input feature completeness.
+- **Interactive What-If Simulation**: Overrides temperature, humidity, storage environment, or packaging to simulate immediate shelf-life impact.
+
+---
+
+## 4. Platform Analytics & Reporting Service (Milestone 4)
+
+- **Real Database Metrics**: Eliminates all mock/hardcoded statistics. The `/api/stats/dashboard` endpoint calculates live facility averages, risk distributions, and spoilage alerts directly from PostgreSQL/SQLite.
+- **RFC-4180 CSV Streaming**: Enables complete inventory exports for warehouse management.
+- **Downloadable Inspection & Forecast JSON Certificates**: Standalone portable records containing model versions, feature snapshots, timestamps, and compliance audit data.
+- **Simulated IoT Stream Ingestion**: `/api/storage-conditions/batch-telemetry` supports bulk sensor logging with strict boundary verification and configurable safety thresholds.
+
+---
+
+## 5. Security & Role-Based Access Control (RBAC)
+
+The system enforces 5 distinct roles with hierarchical and domain-specific permissions:
 
 | Role | Scope | Key Capabilities |
 | :--- | :--- | :--- |
-| **CONSUMER** | Individual User | View personal dashboard, add/view personal food items & inventory. |
-| **RETAIL_MANAGER** | Retail Store | Manage store inventory & batches, view expiry alerts, track freshness stats. |
-| **WAREHOUSE_OPERATOR** | Warehouse Facility | Monitor storage environmental metrics (temp, humidity), manage bulk batch inventory. |
-| **FOOD_QUALITY_INSPECTOR** | Quality Compliance | Audit food item quality ratings, inspect spoilage reports, approve batch status. |
-| **ADMINISTRATOR** | System Wide | Full platform access, manage users, modify system configuration, view platform analytics. |
-
-Security enforcement is performed at the FastAPI route level using custom dependency injection (`require_roles([...])`), parsing JWT payload signatures on every protected endpoint.
+| **CONSUMER** | Individual User | View personal dashboard, track domestic produce, run visual freshness analysis. |
+| **RETAIL_MANAGER** | Retail Store | Manage store batches, export CSVs, run what-if shelf-life simulations, monitor expiry risk. |
+| **WAREHOUSE_OPERATOR** | Warehouse Facility | Log cold-chain telemetry, ingest IoT sensor batch streams, monitor storage deviations. |
+| **FOOD_QUALITY_INSPECTOR** | Quality Compliance | Audit freshness grades, download formal JSON inspection certificates, oversee spoilage alerts. |
+| **ADMINISTRATOR** | System Wide | Full platform access, manage users and roles, inspect system health and global metrics. |
 
 ---
 
-## 3. Future AI Pipeline Integration Design
+## 6. Deployment & Containerization Architecture
 
-Milestone 1 defines clean service interfaces to seamlessly integrate computer vision and predictive models in upcoming milestones:
-
-```text
-[Food Image Upload] ──> [Food Image Analysis Engine (M2)] ──> [Freshness Assessment Engine (M2)]
-                                                                          │
-[Storage Temp & Humidity] ────────────────────────────────────────────────┤
-                                                                          ▼
-                                                         [Shelf-Life Prediction Model (M3)]
-                                                                          │
-                                                                          ▼
-                                                         [Recommendation & Alerts Engine]
-                                                                          │
-                                                                          ▼
-                                                         [Dashboard Telemetry Cards & APIs]
-```
-
----
+- **Multi-Stage Frontend**: Builds static assets via Node 18, serves via lightweight Nginx Alpine container.
+- **Reverse Proxy**: Nginx routes `/api/` and `/uploads/` to the FastAPI backend with HTTP headers preserved.
+- **Data Persistence**: Dedicated Docker volumes (`postgres_data`, `uploads_data`) guarantee that database records and uploaded food images survive container rebuilds.
+- **Health Probes**: Automated Docker health checks ping `/health` to ensure robust orchestrator lifecycle management.

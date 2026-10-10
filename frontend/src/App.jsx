@@ -25,6 +25,7 @@ const AppContent = () => {
   const [publicView, setPublicView] = useState('landing'); // 'landing', 'login', 'register'
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedReport, setSelectedReport] = useState(null);
+  const [selectedInventoryIdForShelfLife, setSelectedInventoryIdForShelfLife] = useState(null);
 
   if (loading) {
     return (
@@ -46,6 +47,11 @@ const AppContent = () => {
     setActiveTab('report-view');
   };
 
+  const handleNavigateShelfLife = (inventoryId) => {
+    setSelectedInventoryIdForShelfLife(inventoryId);
+    setActiveTab('shelf-life');
+  };
+
   // Render Authenticated Dashboard Layout
   const renderAuthenticatedPage = () => {
     if (activeTab === 'report-view' && selectedReport) {
@@ -59,13 +65,19 @@ const AppContent = () => {
 
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardPage setActiveTab={setActiveTab} />;
+        return <DashboardPage setActiveTab={setActiveTab} onNavigateShelfLife={handleNavigateShelfLife} />;
       case 'freshness-analysis':
         return <FreshnessAnalysisPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
       case 'shelf-life':
-        return <ShelfLifePage />;
+        return <ShelfLifePage initialInventoryId={selectedInventoryIdForShelfLife} />;
       case 'inventory':
-        return <InventoryPage setActiveTab={setActiveTab} onSelectReport={handleSelectReport} />;
+        return (
+          <InventoryPage
+            setActiveTab={setActiveTab}
+            onSelectReport={handleSelectReport}
+            onNavigateShelfLife={handleNavigateShelfLife}
+          />
+        );
       case 'add-item':
         return <AddFoodItemPage setActiveTab={setActiveTab} />;
       case 'batches':
@@ -79,7 +91,7 @@ const AppContent = () => {
       case 'settings':
         return <SettingsPage />;
       default:
-        return <DashboardPage setActiveTab={setActiveTab} />;
+        return <DashboardPage setActiveTab={setActiveTab} onNavigateShelfLife={handleNavigateShelfLife} />;
     }
   };
 

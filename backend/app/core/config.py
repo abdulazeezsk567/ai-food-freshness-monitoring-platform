@@ -1,32 +1,38 @@
 import os
-from typing import List
-from pydantic_settings import BaseSettings
+from typing import List, Union
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        extra="ignore"
+    )
+
     APP_NAME: str = "Food Freshness Monitoring Platform"
     ENVIRONMENT: str = "development"
     
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super_secret_jwt_key_change_in_production_32bytes_min")
+    SECRET_KEY: str = "super_secret_jwt_key_change_in_production_32bytes_min"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # Database URL
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "sqlite:///./food_freshness.db"
-    )
+    DATABASE_URL: str = "sqlite:///./food_freshness.db"
     
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000"
     ]
-    
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+
+    @field_validator("CORS_ORIGINS", mode="after")
+    @classmethod
+    def assemble_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [i.strip() for i in v.split(",") if i.strip()]
+        return v
 
 settings = Settings()

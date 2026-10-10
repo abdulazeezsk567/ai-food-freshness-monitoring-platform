@@ -9,6 +9,29 @@ export const FreshnessReportPage = ({ report, onBack }) => {
     window.print();
   };
 
+  const handleExportJSON = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/reports/freshness/${report.id}/json`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to download inspection report JSON');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `freshness_inspection_report_${report.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert(err.message || 'Export failed');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in print:p-0">
       {/* Top Header Controls (Hidden when printing) */}
@@ -19,12 +42,20 @@ export const FreshnessReportPage = ({ report, onBack }) => {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Analysis
         </button>
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 text-xs font-bold text-white px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-lg transition"
-        >
-          <Printer className="w-4 h-4" /> Print / Save Report PDF
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportJSON}
+            className="flex items-center gap-2 text-xs font-bold text-slate-200 hover:text-white px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition"
+          >
+            <FileText className="w-4 h-4 text-cyan-400" /> Export JSON Certificate
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 text-xs font-bold text-white px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-lg transition"
+          >
+            <Printer className="w-4 h-4" /> Print / Save Report PDF
+          </button>
+        </div>
       </div>
 
       {/* Formal Printable Document Card */}

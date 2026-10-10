@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ALLOWED_STORAGE_CONDITIONS = {"Refrigerated", "Frozen", "Room Temperature", "Controlled Storage", "Unknown"}
@@ -51,3 +51,40 @@ class StorageConditionResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class TelemetryReadingItem(BaseModel):
+    temperature: float = Field(..., ge=-30.0, le=60.0, description="Temperature in Celsius (-30 to 60)")
+    humidity: float = Field(..., ge=0.0, le=100.0, description="Relative humidity percentage (0 to 100)")
+    storage_location: Optional[str] = "Cold Room A"
+    packaging_type: Optional[str] = "Standard Packaging"
+    storage_condition: Optional[str] = "Refrigerated"
+    storage_duration_days: Optional[int] = Field(1, ge=0)
+    notes: Optional[str] = None
+
+    @field_validator('storage_condition')
+    @classmethod
+    def validate_reading_condition(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ALLOWED_STORAGE_CONDITIONS:
+            raise ValueError(f"Invalid storage_condition. Must be one of: {', '.join(sorted(ALLOWED_STORAGE_CONDITIONS))}")
+        return v
+
+    @field_validator('packaging_type')
+    @classmethod
+    def validate_reading_packaging(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ALLOWED_PACKAGING_TYPES:
+            raise ValueError(f"Invalid packaging_type. Must be one of: {', '.join(sorted(ALLOWED_PACKAGING_TYPES))}")
+        return v
+
+class BatchTelemetryIngestRequest(BaseModel):
+    inventory_id: int
+    sensor_id: str = Field("IOT-SENSOR-NODE-01", max_length=100)
+    readings: List[TelemetryReadingItem] = Field(..., min_length=1, max_length=50, description="Batch of sensor pings (max 50 per call)")
+
+class BatchTelemetryIngestResponse(BaseModel):
+    inventory_id: int
+    sensor_id: str
+    ingested_count: int
+    latest_temperature: float
+    latest_humidity: float
+    alerts_triggered: List[str]
+    status: str

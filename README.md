@@ -6,18 +6,49 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
+---
+
 ## Description
 
-The **AI-Powered Food Freshness Detection and Predictive Shelf Life Monitoring Platform** uses visual food image analysis, environmental storage conditions, packaging formats, and quality degradation velocity to estimate food freshness, predict remaining shelf life, detect visual spoilage indicators, and generate storage recommendations across supply chains.
+The **AI-Powered Food Freshness Detection and Predictive Shelf Life Monitoring Platform** is a full-stack platform designed for modern food supply chain operations, retail grocery management, warehouse cold chains, and consumers. The platform integrates computer vision inspection, environmental IoT storage telemetry, and deterministic predictive decay modeling to evaluate food quality, forecast remaining shelf life, detect spoilage defects, and provide actionable storage guidance.
 
 ---
 
-## Milestone 3 Implementation & Hardening Scope (COMPLETED)
+## Milestone 4 Implementation Scope (COMPLETED)
+
+Milestone 4 completes the platform with **Full-Stack Analytics, Automated Reporting, IoT Telemetry, and Production Deployment Hardening**:
+
+### 1. Real Database-Driven Analytics Dashboard
+- **No Mock Statistics**: All dashboard analytics are computed directly from live database records.
+- **Facility Telemetry**: Real-time average facility temperature (°C) and relative humidity (%) computed across all active storage logs.
+- **Shelf-Life Risk Breakdown**: Aggregated batch counts categorized by risk levels (`CRITICAL`, `HIGH RISK`, `MEDIUM RISK`, `LOW RISK`), alongside average remaining days.
+- **Computer Vision Freshness Metrics**: Overall average freshness score (0–100) and grade distribution across all inspections.
+- **Active Spoilage & Telemetry Alerts Feed**: Live feed highlighting batches with high spoilage risk or out-of-range storage conditions.
+
+### 2. Comprehensive Reporting & Certificate Export Engine
+- **Inventory CSV Export (`GET /api/reports/inventory/csv`)**: RFC-4180 streaming export of the entire inventory catalogue.
+- **Freshness Inspection Certificate (`GET /api/reports/freshness/{id}/json`)**: Downloadable JSON certificate including CV color indices, GLCM texture metrics, detected defects, and model version.
+- **Shelf-Life Forecast Certificate (`GET /api/reports/shelf-life/{id}/json`)**: Downloadable JSON audit certificate capturing the predictive feature snapshot, degradation velocity, and storage recommendations.
+
+### 3. High-Throughput IoT Batch Telemetry Ingestion
+- **Batch Endpoint (`POST /api/storage-conditions/batch-telemetry` & alias `/simulate-stream`)**: Ingests bulk readings from IoT sensor arrays.
+- **Safe Payload Caps & Validation**: Limits ingestion to $\le 50$ readings per batch, validating realistic environmental boundaries (-30°C to 60°C, 0–100% RH) and returning threshold alerts.
+
+### 4. Containerization & Production Deployment
+- **Multi-Stage Frontend Dockerfile**: Builds static assets with Node.js and serves via an optimized Nginx Alpine image.
+- **Reverse Proxy**: Nginx routes `/api/` and `/uploads/` directly to the backend service.
+- **Persistent Media Volume**: Dedicated `uploads_data` volume prevents loss of uploaded inspection images during container lifecycles.
+- **Automated Health Probes**: Backend `/health` probe integrated into Docker health checks.
+- **Flexible Configuration**: Pydantic v2 `SettingsConfigDict` resolving environment variables across `.env` and `../.env`.
+
+---
+
+## Milestone 3 Implementation Scope (COMPLETED)
 
 Milestone 3 delivers **Predictive Shelf-Life Monitoring & Risk Assessment** powered by a deterministic, multi-factor baseline model (`shelf-life-baseline-v1`):
 
 ### 1. Deterministic Predictive Baseline Model (`shelf-life-baseline-v1`)
-The remaining shelf-life calculation follows a transparent, deterministic multi-factor formula:
+The remaining shelf-life calculation follows a transparent, multi-factor formula:
 
 $$\text{Remaining Shelf Life} = \max\left(0, \left(\text{Base Days} \times \text{Freshness Factor} \times \text{Spoilage Factor} \times \text{Temp Factor} \times \text{Humidity Factor} \times \text{Packaging Factor} \times \text{Condition Factor} \times \text{Trend Factor}\right) - \text{Food Age}\right)$$
 
@@ -25,57 +56,39 @@ $$\text{Remaining Shelf Life} = \max\left(0, \left(\text{Base Days} \times \text
 
 ### 2. Multi-Factor Impact Breakdown
 - **Category Baseline Days**: Food item category baselines (Fruits: 14d, Vegetables: 10d, Dairy: 7d, Meat & Poultry: 5d, Seafood: 3d, Bakery: 4d, Beverages: 30d, Pantry: 90d).
-- **Freshness & Spoilage Factors**: Derived from visual computer vision analysis if available (`has_image_analysis: true`), or defaults to baseline starting freshness (`has_image_analysis: false`).
-- **Temperature & Humidity Factors**: Quantifies environmental deviation from optimal temperature (°C) and relative humidity (%).
-- **Packaging Format Factor**: Multipliers for Vacuum Sealed (1.25x), Aseptic (1.15x), MAP (1.10x), Standard/Plastic (1.0x), Paper (0.85x), and Loose (0.70x).
-- **Storage Condition Factor**: Multipliers for Frozen (1.8x), Refrigerated (1.0x), Room Temperature penalty for perishables (0.40x), Controlled Storage (1.15x).
+- **Assisted vs. Baseline Mode**: Accurately tracks whether an assessment is assisted by visual computer vision (`has_image_analysis: true`) or derived strictly from inventory and storage telemetry (`has_image_analysis: false`).
 - **Timestamp-Based Degradation Velocity**: Calculates exact score change over elapsed days ($\Delta \text{Score} / \Delta t$) across historical visual assessments (`Declining`, `Stable`, `Improving`, `Insufficient Data`).
 - **Transparent Heuristic Confidence Score**: Calculated based on data completeness (image analysis +0.30, storage log +0.20, historical trend +0.15, specialized packaging +0.05).
-
-### 3. Backend Input Validation & Safety Guarantees
-- Strict Pydantic v2 validation for inputs:
-  - `freshness_score`: Range 0–100
-  - `spoilage_probability`: Range 0.0–1.0
-  - `humidity`: Range 0.0%–100.0%
-  - `temperature`: Range -30.0°C to 60.0°C
-  - `storage_duration_days`: $\ge 0$
-  - `storage_condition`: Allowed set (`Refrigerated`, `Frozen`, `Room Temperature`, `Controlled Storage`, `Unknown`)
-  - `packaging_type`: Allowed set (`Standard Packaging`, `Vacuum Sealed`, `Aseptic Packaging`, `Modified Atmosphere Packaging (MAP)`, `Plastic Tray with Film`, `Paper Wrapping`, `Unpackaged / Loose`)
-- **Guaranteed Consistency**: Remaining days $\ge 0$, estimated expiry date strictly equals $\text{today} + \text{remaining\_days}$, no contradictory risk states.
+- **Interactive Storage What-If Simulator**: Tweak storage temperature, humidity, storage environment, or packaging to dynamically recalculate shelf-life.
 
 ---
 
 ## Milestone 2 Implementation Scope (COMPLETED)
 
-Milestone 2 expands the platform with **Image Analysis & Visual Freshness Assessment** capabilities:
+Milestone 2 provides **Image Analysis & Visual Freshness Assessment** capabilities:
 - **Food Image Upload & Validation**: Dropzone for JPG, PNG, and WEBP formats up to 10MB.
 - **Computer Vision Pipeline (`backend/app/ml/`)**: Preprocessing, color analysis (Browning Index), texture analysis (GLCM), spoilage indicator detection, and 5-category freshness classification.
 - **Frontend Inspection Workflows**: `/freshness-analysis` page, printable inspection reports, and batch freshness history.
 
 ---
 
-## Technology Stack
-
-- **Backend**: Python, FastAPI, SQLAlchemy ORM, Pydantic v2, PyJWT, bcrypt, Pillow, OpenCV, NumPy
-- **Frontend**: React.js, JavaScript, Tailwind CSS, Lucide Icons, Vite
-- **Database**: PostgreSQL (Primary) / SQLite (Development fallback)
-- **ML & Predictive Engine**: Custom Baseline Engine (`shelf-life-baseline-v1`), OpenCV, NumPy, Scikit-learn
-- **Authentication**: JWT (JSON Web Tokens), OAuth2 Password Bearer, bcrypt
-- **Tools & Infrastructure**: Git, GitHub, Docker, Pytest, Uvicorn
-
----
-
-## Features Implemented (Milestones 1, 2 & 3)
+## Milestone 1 Implementation Scope (COMPLETED)
 
 - **Authentication System**: User registration, JWT login, profile endpoint, and frontend logout.
 - **Role-Based Authorization**: Granular route guards for 5 distinct roles (`CONSUMER`, `RETAIL_MANAGER`, `WAREHOUSE_OPERATOR`, `FOOD_QUALITY_INSPECTOR`, `ADMINISTRATOR`).
 - **Inventory & Batch Tracking**: Manage food products, batch codes, quantities, purchase dates, and expiration dates.
-- **Cold-Chain Telemetry Logging**: Track storage temperature (°C), relative humidity (%), storage facility types, and packaging formats.
-- **Visual Image Freshness Analysis**: Upload food images to compute 0-100 freshness score, 5-category classification, and spoilage probabilities.
-- **Predictive Shelf-Life Forecasting**: Compute remaining days, estimated expiry date, degradation velocity, risk tier, and trend.
-- **Interactive Storage What-If Simulator**: Tweak storage temperature, humidity, storage environment, or packaging to dynamically recalculate shelf-life.
-- **Actionable Storage Guidance**: Data-driven recommendations to extend food shelf life and minimize waste.
-- **Printable Inspection Reports**: Generate formal certificates with scores, metrics, timestamps, and model version.
+
+---
+
+## Technology Stack
+
+- **Backend**: Python 3.11+, FastAPI 0.115+, SQLAlchemy 2.0 ORM, Pydantic v2, PyJWT, passlib/bcrypt, Pillow, OpenCV, NumPy
+- **Frontend**: React 18, JavaScript, Tailwind CSS, Lucide Icons, Vite 5
+- **Database**: PostgreSQL 15 (Primary) / SQLite (Development & Pytest)
+- **ML & Predictive Engine**: Custom Baseline Engine (`shelf-life-baseline-v1`), OpenCV, NumPy, Scikit-learn
+- **Reverse Proxy & Web Server**: Nginx Alpine
+- **Containerization**: Docker, Docker Compose
+- **Testing**: Pytest, HTTPX
 
 ---
 
@@ -93,11 +106,12 @@ ai-food-freshness-monitoring-platform/
 │   │   └── main.jsx
 │   ├── package.json
 │   ├── vite.config.js
-│   └── Dockerfile
+│   ├── nginx.conf             # Production Nginx reverse-proxy configuration
+│   └── Dockerfile             # Multi-stage production container build
 │
 ├── backend/                   # FastAPI REST API backend
 │   ├── app/
-│   │   ├── main.py            # FastAPI entry point & CORS & static uploads
+│   │   ├── main.py            # FastAPI entry point & CORS & static uploads & health probe
 │   │   ├── core/              # Config, Security (JWT/bcrypt), Permissions (RBAC)
 │   │   ├── database/          # SQLAlchemy session setup
 │   │   ├── ml/                # Computer Vision & ML Pipeline & Shelf Life Predictive Engine
@@ -105,10 +119,10 @@ ai-food-freshness-monitoring-platform/
 │   │   │   ├── shelf_life_model.py      # Deterministic shelf-life model (shelf-life-baseline-v1)
 │   │   │   └── shelf_life_predictor.py  # Master predictor orchestrator
 │   │   ├── models/            # SQLAlchemy database models (User, FoodItem, Inventory, AnalysisResult, StorageCondition, ShelfLifePrediction)
-│   │   ├── schemas/           # Pydantic schemas (User, FoodItem, Inventory, Freshness, StorageCondition, ShelfLifePrediction)
-│   │   ├── routers/           # Auth, Users, FoodItems, Inventory, Stats, Freshness, Storage, ShelfLife
+│   │   ├── schemas/           # Pydantic schemas (User, FoodItem, Inventory, Freshness, StorageCondition, ShelfLifePrediction, Reports, Stats)
+│   │   ├── routers/           # Auth, Users, FoodItems, Inventory, Stats, Freshness, Storage, ShelfLife, Reports
 │   │   └── services/          # Seed demo data service
-│   ├── tests/                 # Pytest test suite (Auth, Users, FoodItems, Inventory, Freshness, Shelf Life)
+│   ├── tests/                 # Complete Pytest test suite (38 automated test cases)
 │   ├── uploads/               # Uploaded food freshness images directory
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -116,7 +130,10 @@ ai-food-freshness-monitoring-platform/
 ├── ml/                        # ML Training & Evaluation Infrastructure
 ├── datasets/                  # Dataset organization structure
 ├── docs/                      # Technical documentation
-├── docker-compose.yml
+│   ├── architecture.md        # Full architecture & component specifications
+│   ├── api-documentation.md   # Complete REST API reference
+│   └── database-schema.md     # Relational entity-relationship specifications
+├── docker-compose.yml         # Multi-container orchestration (DB, Backend, Frontend)
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -124,29 +141,38 @@ ai-food-freshness-monitoring-platform/
 
 ---
 
-## Environment Variables
+## Running the Platform
 
-Copy `.env.example` to create your local `.env` configuration:
+### Option A: Running via Docker Compose (Recommended for Production)
 
 ```bash
-cp .env.example .env
+docker-compose up --build
 ```
+
+Services will be accessible at:
+- **Web Dashboard**: `http://localhost:5173`
+- **Backend API Docs**: `http://localhost:8000/docs`
+- **Backend Health Check**: `http://localhost:8000/health`
 
 ---
 
-## Running the Project Locally
+### Option B: Running Locally for Development
 
-### 1. Backend Setup
+#### 1. Backend Setup
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+# source venv/bin/activate
+
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 2. Frontend Setup
+#### 2. Frontend Setup
 
 ```bash
 cd frontend
@@ -160,7 +186,7 @@ The application will be accessible at:
 
 ---
 
-## Backend Test Suite
+## Automated Verification & Testing
 
 Run all backend tests:
 
@@ -169,9 +195,16 @@ cd backend
 python -m pytest tests/ -v
 ```
 
-Output:
+**Test Suite Results:**
 ```text
-31 passed in 5.05s
+38 passed in ~19s
+```
+
+Run frontend production build verification:
+
+```bash
+cd frontend
+npm run build
 ```
 
 ---
@@ -179,4 +212,4 @@ Output:
 ## Model & Safety Disclaimers
 
 - **Baseline Model**: `shelf-life-baseline-v1` is a transparent heuristic baseline formula.
-- **Safety Exclaust**: Predictions are operational guidelines and do **not** replace certified food safety regulations or laboratory shelf-life testing.
+- **Safety Exclusion**: Predictions are operational guidelines and do **not** replace certified food safety regulations or laboratory microbiological shelf-life testing.

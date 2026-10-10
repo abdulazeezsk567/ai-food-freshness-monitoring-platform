@@ -5,9 +5,9 @@ import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { CATEGORIES, UNITS, PACKAGING_TYPES } from '../utils/constants';
-import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets, History, Sparkles, Clock } from 'lucide-react';
+import { Search, Filter, Plus, Edit2, Trash2, RefreshCw, Thermometer, Droplets, History, Sparkles, Clock, FileSpreadsheet, Download } from 'lucide-react';
 
-export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
+export const InventoryPage = ({ setActiveTab, onSelectReport, onNavigateShelfLife }) => {
   const { user } = useAuth();
   const { addToast } = useNotification();
   const [inventory, setInventory] = useState([]);
@@ -102,6 +102,30 @@ export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
     }
   };
 
+  const handleExportCSV = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/reports/inventory/csv', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to generate inventory CSV export');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `food_inventory_report_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      addToast('Inventory CSV export downloaded successfully', 'success');
+    } catch (err) {
+      addToast(err.message || 'CSV Export failed', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
@@ -111,6 +135,13 @@ export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
           <p className="text-xs text-slate-400 mt-1">Track physical batches, storage conditions, and freshness history</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-2 shadow-sm"
+            title="Download Inventory CSV Report"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Export CSV
+          </button>
           <button
             onClick={fetchInventory}
             className="p-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition"
@@ -235,7 +266,13 @@ export const InventoryPage = ({ setActiveTab, onSelectReport }) => {
                           <History className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => setActiveTab('shelf-life')}
+                          onClick={() => {
+                            if (onNavigateShelfLife) {
+                              onNavigateShelfLife(item.id);
+                            } else {
+                              setActiveTab('shelf-life');
+                            }
+                          }}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition"
                           title="Predictive Shelf-Life Forecast"
                         >

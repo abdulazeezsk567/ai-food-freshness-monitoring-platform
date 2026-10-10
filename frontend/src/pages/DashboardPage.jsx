@@ -13,10 +13,15 @@ import {
   Droplets, 
   Cpu, 
   Sparkles, 
-  ArrowUpRight 
+  ArrowUpRight,
+  ShieldCheck,
+  TrendingDown,
+  Activity,
+  FileSpreadsheet,
+  Camera
 } from 'lucide-react';
 
-export const DashboardPage = ({ setActiveTab }) => {
+export const DashboardPage = ({ setActiveTab, onNavigateShelfLife }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,20 +47,52 @@ export const DashboardPage = ({ setActiveTab }) => {
     );
   }
 
+  const facility = stats?.facility_telemetry || {
+    avg_temperature: 4.0,
+    avg_humidity: 85.0,
+    temp_alert_count: 0,
+    humidity_alert_count: 0,
+    active_monitored_batches: stats?.active_batches || 0
+  };
+
+  const shelfLife = stats?.shelf_life_analytics || {
+    risk_distribution: { "CRITICAL": 0, "HIGH RISK": 0, "MEDIUM RISK": 0, "LOW RISK": 0 },
+    avg_remaining_days: 0.0,
+    total_predictions: 0
+  };
+
+  const freshness = stats?.freshness_analytics || {
+    total_analyses: 0,
+    avg_freshness_score: 0.0,
+    classification_distribution: {}
+  };
+
+  const alerts = stats?.spoilage_alerts || [];
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-slate-800">
         <div>
-          <h2 className="text-2xl font-black text-white tracking-tight">Platform Dashboard Overview</h2>
-          <p className="text-xs text-slate-400 mt-1">Real-time telemetry and inventory freshness tracking</p>
+          <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+            Platform Dashboard & Analytics
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">Real-time facility telemetry, predictive shelf-life forecasting, and visual freshness audits</p>
         </div>
-        <button
-          onClick={() => setActiveTab('add-item')}
-          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-lg shadow-emerald-500/20 transition self-start sm:self-auto"
-        >
-          + Add Food Batch
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTab('freshness-analysis')}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-2"
+          >
+            <Camera className="w-4 h-4 text-purple-400" /> Freshness Scan
+          </button>
+          <button
+            onClick={() => setActiveTab('add-item')}
+            className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-lg shadow-emerald-500/20 transition"
+          >
+            + Add Food Batch
+          </button>
+        </div>
       </div>
 
       {/* 6 Metric Stat Cards Grid */}
@@ -79,7 +116,7 @@ export const DashboardPage = ({ setActiveTab }) => {
           color="text-amber-400 bg-amber-500"
         />
         <StatCard
-          title="Expired Items"
+          title="Expired / Spoiled"
           value={stats?.expired_items || 0}
           icon={AlertOctagon}
           color="text-rose-400 bg-rose-500"
@@ -98,78 +135,185 @@ export const DashboardPage = ({ setActiveTab }) => {
         />
       </div>
 
-      {/* Main Grid: Storage Telemetry & AI Placeholder */}
+      {/* Analytics Grid: Real Telemetry, Shelf-Life Risk Distribution & CV Freshness Engine */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Storage Telemetry Summary */}
+
+        {/* 1. Real Storage Telemetry Summary */}
         <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Thermometer className="w-4 h-4 text-emerald-400" /> Facility Telemetry
             </h3>
-            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              Live Feed
-            </span>
+            {facility.temp_alert_count > 0 ? (
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                {facility.temp_alert_count} Alerts
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Optimal
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-2 gap-4 pt-1">
             <div className="glass-panel p-4 rounded-xl text-center">
               <Thermometer className="w-6 h-6 text-amber-400 mx-auto mb-1" />
-              <div className="text-2xl font-black text-white">3.8 °C</div>
-              <p className="text-[11px] text-slate-400 font-medium">Avg Temp (Target: 4°C)</p>
+              <div className="text-2xl font-black text-white">{facility.avg_temperature} °C</div>
+              <p className="text-[11px] text-slate-400 font-medium">Mean Storage Temp</p>
             </div>
 
             <div className="glass-panel p-4 rounded-xl text-center">
               <Droplets className="w-6 h-6 text-cyan-400 mx-auto mb-1" />
-              <div className="text-2xl font-black text-white">84.2 %</div>
-              <p className="text-[11px] text-slate-400 font-medium">Avg Humidity (85%)</p>
+              <div className="text-2xl font-black text-white">{facility.avg_humidity} %</div>
+              <p className="text-[11px] text-slate-400 font-medium">Mean Relative Humidity</p>
             </div>
           </div>
 
-          <div className="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-            <span className="font-semibold text-slate-200">Optimal Storage Conditions:</span> Cold storage facility metrics are within standard food safety tolerances.
-          </div>
-        </div>
-
-        {/* Future AI Freshness Assessment Stub (Clearly Marked) */}
-        <div className="lg:col-span-2 glass-card p-6 rounded-2xl border border-purple-500/30 bg-purple-950/10 relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">AI Freshness Engine</h3>
-              </div>
-              <span className="text-[11px] font-bold text-purple-300 bg-purple-500/20 px-2.5 py-1 rounded-full border border-purple-500/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Scheduled for Milestone 2 & 3
+          <div className="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1">
+            <div className="flex justify-between">
+              <span>Monitored Batches:</span>
+              <span className="font-bold text-white">{facility.active_monitored_batches} batches</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Thermal Breaches:</span>
+              <span className={facility.temp_alert_count > 0 ? "font-bold text-amber-400" : "font-bold text-emerald-400"}>
+                {facility.temp_alert_count} logged
               </span>
             </div>
+          </div>
+        </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              Future releases will process captured food images alongside storage temperature, relative humidity, packaging type, and storage duration to run real-time spoilage classification & remaining shelf-life prediction models.
-            </p>
+        {/* 2. Shelf-Life Risk Distribution (shelf-life-baseline-v1) */}
+        <div className="glass-card p-6 rounded-2xl border border-cyan-500/30 bg-cyan-950/10 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Shelf-Life Risk Tiers</h3>
+            </div>
+            <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+              shelf-life-baseline-v1
+            </span>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-purple-900/20 border border-purple-500/20 text-center">
-                <div className="text-xs font-bold text-purple-300">Vision Analysis</div>
-                <p className="text-[10px] text-slate-400 mt-1">Rotten vs Fresh Fruit/Veg Classification</p>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-900/20 border border-purple-500/20 text-center">
-                <div className="text-xs font-bold text-purple-300">Predictive Model</div>
-                <p className="text-[10px] text-slate-400 mt-1">Remaining Shelf Life (Days Prediction)</p>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-900/20 border border-purple-500/20 text-center">
-                <div className="text-xs font-bold text-purple-300">Smart Advice</div>
-                <p className="text-[10px] text-slate-400 mt-1">Storage Temperature Recommendations</p>
-              </div>
+          <div className="glass-panel p-3 rounded-xl flex items-center justify-between">
+            <span className="text-xs text-slate-300">Mean Remaining Shelf Life:</span>
+            <span className="text-lg font-black text-cyan-300">{shelfLife.avg_remaining_days} Days</span>
+          </div>
+
+          {/* 4 Risk Distribution Progress / Counters */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-rose-500/30 flex justify-between items-center">
+              <span className="text-rose-400 font-bold">CRITICAL:</span>
+              <span className="font-black text-white">{shelfLife.risk_distribution["CRITICAL"] || 0}</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-amber-500/30 flex justify-between items-center">
+              <span className="text-amber-400 font-bold">HIGH RISK:</span>
+              <span className="font-black text-white">{shelfLife.risk_distribution["HIGH RISK"] || 0}</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-yellow-500/30 flex justify-between items-center">
+              <span className="text-yellow-300 font-bold">MEDIUM:</span>
+              <span className="font-black text-white">{shelfLife.risk_distribution["MEDIUM RISK"] || 0}</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-900/80 border border-emerald-500/30 flex justify-between items-center">
+              <span className="text-emerald-400 font-bold">LOW RISK:</span>
+              <span className="font-black text-white">{shelfLife.risk_distribution["LOW RISK"] || 0}</span>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-purple-500/20 flex items-center justify-between text-xs text-purple-300/80">
-            <span>Datasets initialized in <code className="text-purple-200">datasets/raw/</code></span>
-            <button onClick={() => setActiveTab('datasets')} className="hover:underline flex items-center gap-1 font-semibold">
-              Explore Datasets <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab('shelf-life')}
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-500/30 transition flex items-center justify-center gap-1.5"
+          >
+            Launch Predictive Shelf-Life Inspector <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
         </div>
+
+        {/* 3. Computer Vision Freshness Engine Analytics */}
+        <div className="glass-card p-6 rounded-2xl border border-purple-500/30 bg-purple-950/10 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vision Freshness Index</h3>
+            </div>
+            <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+              Active CV Pipeline
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass-panel p-3 rounded-xl text-center">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Mean Score</span>
+              <span className="text-2xl font-black text-purple-300">{freshness.avg_freshness_score} <span className="text-xs">/100</span></span>
+            </div>
+            <div className="glass-panel p-3 rounded-xl text-center">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Inspections</span>
+              <span className="text-2xl font-black text-white">{freshness.total_analyses}</span>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="text-slate-400 font-semibold block text-[11px] mb-1">Recent Category Distribution:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(freshness.classification_distribution || {}).map(([cat, count]) => (
+                <span key={cat} className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-900/30 text-purple-300 border border-purple-500/30">
+                  {cat}: {count}
+                </span>
+              ))}
+              {Object.keys(freshness.classification_distribution || {}).length === 0 && (
+                <span className="text-slate-500 text-[11px]">No image analyses recorded yet.</span>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('freshness-analysis')}
+            className="w-full py-2.5 rounded-xl text-xs font-bold text-purple-300 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-500/30 transition flex items-center justify-center gap-1.5"
+          >
+            Perform Visual Freshness Inspection <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+      </div>
+
+      {/* Active Spoilage & Telemetry Alerts Feed */}
+      <div className="glass-card rounded-2xl border border-slate-800 p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-400" /> Active Spoilage & Telemetry Alerts Feed
+          </h3>
+          <span className="text-xs text-slate-400">{alerts.length} Active Notice{alerts.length === 1 ? '' : 's'}</span>
+        </div>
+
+        {alerts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className={`p-4 rounded-xl border text-xs space-y-1.5 ${
+                  alert.severity === 'critical'
+                    ? 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                    : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white flex items-center gap-1">
+                    {alert.severity === 'critical' ? <AlertOctagon className="w-3.5 h-3.5 text-rose-400" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
+                    {alert.title}
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-400">{alert.batch_number}</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300">{alert.message}</p>
+                <div className="text-[10px] text-slate-500 pt-1">
+                  Item: <span className="text-slate-300 font-medium">{alert.item_name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" /> All physical inventory batches and cold-storage conditions are within nominal safety limits.
+          </div>
+        )}
       </div>
 
       {/* Inventory Overview Table */}

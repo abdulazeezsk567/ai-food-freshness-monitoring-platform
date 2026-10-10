@@ -14,7 +14,8 @@ from app.routers import (
     stats_router,
     freshness_router,
     storage_router,
-    shelf_life_router
+    shelf_life_router,
+    reports_router
 )
 from app.services.seed import seed_database
 
@@ -24,20 +25,22 @@ os.makedirs(os.path.join(UPLOAD_DIR, "freshness"), exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure database tables exist
-    Base.metadata.create_all(bind=engine)
-    # Seed initial demo data
-    db = SessionLocal()
+    # Ensure database tables exist and demo data is seeded
     try:
-        seed_database(db)
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+        try:
+            seed_database(db)
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Database initialization warning: {e}")
     yield
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI-powered Food Freshness Monitoring Platform - REST API",
-    version="3.0.0",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -64,6 +67,7 @@ app.include_router(stats_router)
 app.include_router(freshness_router)
 app.include_router(storage_router)
 app.include_router(shelf_life_router)
+app.include_router(reports_router)
 
 @app.get("/", tags=["System Overview"])
 def root():
@@ -71,7 +75,16 @@ def root():
         "status": "online",
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT,
-        "version": "3.0.0"
+        "version": "4.0.0"
+    }
+
+@app.get("/health", tags=["System Overview"])
+def health_check():
+    return {
+        "status": "healthy",
+        "app": settings.APP_NAME,
+        "environment": settings.ENVIRONMENT,
+        "version": "4.0.0"
     }
 
 if __name__ == "__main__":

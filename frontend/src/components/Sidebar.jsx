@@ -64,10 +64,10 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       <div className="p-4 rounded-xl glass-card border border-emerald-500/20 bg-emerald-950/20">
         <div className="flex items-center gap-2 mb-2">
           <Cpu className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-bold text-emerald-300">Milestone 3 Active</span>
+          <span className="text-xs font-bold text-emerald-300">Milestone 4 Complete</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-snug">
-          Predictive shelf-life forecasting & environmental storage condition engine online.
+          Full-stack analytics, automated reporting, IoT telemetry & production monitoring online.
         </p>
       </div>
     </aside>

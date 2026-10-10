@@ -20,7 +20,8 @@ import {
   Camera,
   Info,
   Sliders,
-  Layers
+  Layers,
+  Download
 } from 'lucide-react';
 
 export const ShelfLifePage = ({ initialInventoryId = null }) => {
@@ -58,6 +59,12 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
     };
     loadInventory();
   }, []);
+
+  useEffect(() => {
+    if (initialInventoryId) {
+      setSelectedInventoryId(initialInventoryId);
+    }
+  }, [initialInventoryId]);
 
   useEffect(() => {
     if (!selectedInventoryId) return;
@@ -127,6 +134,30 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
     }
   };
 
+  const handleDownloadShelfLifeJson = async (predId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/reports/shelf-life/${predId}/json`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to generate shelf-life report');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shelf-life-forecast-${predId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      addToast('Shelf-life JSON certificate downloaded successfully!', 'success');
+    } catch (err) {
+      addToast(err.message || 'Error exporting JSON report', 'error');
+    }
+  };
+
   const selectedItem = inventoryList.find(i => i.id === parseInt(selectedInventoryId));
 
   const getRiskBadgeColor = (risk) => {
@@ -156,6 +187,16 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
           <p className="text-xs text-slate-400 mt-1">Multi-factor baseline expiration forecasting based on category baselines, storage telemetry, packaging, and degradation velocity</p>
         </div>
         <div className="flex items-center gap-2">
+          {prediction?.id && (
+            <button
+              onClick={() => handleDownloadShelfLifeJson(prediction.id)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Download RFC JSON Shelf-Life Certificate"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              Export Certificate (JSON)
+            </button>
+          )}
           <span className="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
             Model: shelf-life-baseline-v1
           </span>

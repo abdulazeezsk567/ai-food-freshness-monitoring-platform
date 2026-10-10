@@ -6,6 +6,7 @@ from app.routers.stats import router as stats_router
 from app.routers.freshness import router as freshness_router
 from app.routers.storage import router as storage_router
 from app.routers.shelf_life import router as shelf_life_router
+from app.routers.reports import router as reports_router
 
 __all__ = [
     "auth_router",
@@ -15,5 +16,6 @@ __all__ = [
     "stats_router",
     "freshness_router",
     "storage_router",
-    "shelf_life_router"
+    "shelf_life_router",
+    "reports_router"
 ]
