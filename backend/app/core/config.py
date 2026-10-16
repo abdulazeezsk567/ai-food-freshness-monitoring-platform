@@ -9,15 +9,18 @@ def normalize_database_url(url: str) -> str:
     Specifically ensures PostgreSQL connections use the installed psycopg2 driver:
     - 'postgres://' -> 'postgresql+psycopg2://'
     - 'postgresql://' -> 'postgresql+psycopg2://'
+    - 'postgresql+psycopg://' -> 'postgresql+psycopg2://'
     - 'postgresql+psycopg2://' -> unchanged
     Other database schemes (such as 'sqlite://') are preserved as-is.
     """
     if not url:
         return url
 
-    url = url.strip()
+    url = url.strip().strip("'\"")
     if url.startswith("postgresql+psycopg2://"):
         return url
+    if url.startswith("postgresql+psycopg://"):
+        return "postgresql+psycopg2://" + url[len("postgresql+psycopg://"):]
     if url.startswith("postgres://"):
         return "postgresql+psycopg2://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
