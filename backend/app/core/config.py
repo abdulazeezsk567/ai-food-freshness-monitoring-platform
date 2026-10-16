@@ -3,6 +3,27 @@ from typing import List, Union, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
+def normalize_database_url(url: str) -> str:
+    """
+    Normalizes database connection strings for SQLAlchemy compatibility.
+    Specifically ensures PostgreSQL connections use the installed psycopg2 driver:
+    - 'postgres://' -> 'postgresql+psycopg2://'
+    - 'postgresql://' -> 'postgresql+psycopg2://'
+    - 'postgresql+psycopg2://' -> unchanged
+    Other database schemes (such as 'sqlite://') are preserved as-is.
+    """
+    if not url:
+        return url
+
+    url = url.strip()
+    if url.startswith("postgresql+psycopg2://"):
+        return url
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg2://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://"):]
+    return url
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
@@ -25,9 +46,7 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="after")
     @classmethod
     def assemble_database_url(cls, v: str) -> str:
-        if v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql://", 1)
-        return v
+        return normalize_database_url(v)
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [
