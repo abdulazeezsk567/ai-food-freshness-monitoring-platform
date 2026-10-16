@@ -49,7 +49,7 @@ services:
         fromService:
           type: web
           name: food-freshness-backend
-          property: host
+          envVarKey: RENDER_EXTERNAL_URL
 
 # ---------------------------------------------------------------------------
 # 3. Managed Relational Database (PostgreSQL 15)
