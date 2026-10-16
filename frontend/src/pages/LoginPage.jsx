@@ -28,7 +28,7 @@ export const LoginPage = ({ onNavigate }) => {
   };
 
   const demoAccounts = [
-    { role: 'System Admin', email: 'admin@foodfreshness.com', pass: 'Admin123!', color: 'border-purple-500/40 text-purple-300' },
+    ...(import.meta.env.DEV ? [{ role: 'System Admin', email: 'admin@foodfreshness.com', pass: 'Admin123!', color: 'border-purple-500/40 text-purple-300' }] : []),
     { role: 'Retail Manager', email: 'retail@foodfreshness.com', pass: 'Manager123!', color: 'border-emerald-500/40 text-emerald-300' },
     { role: 'Food Inspector', email: 'inspector@foodfreshness.com', pass: 'Inspector123!', color: 'border-cyan-500/40 text-cyan-300' },
     { role: 'Warehouse Operator', email: 'warehouse@foodfreshness.com', pass: 'Warehouse123!', color: 'border-amber-500/40 text-amber-300' },

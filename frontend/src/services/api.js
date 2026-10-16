@@ -1,6 +1,23 @@
-const BASE_URL = '/api';
+export const API_BASE_URL = (() => {
+  let url = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+  return url;
+})();
 
-const getAuthToken = () => localStorage.getItem('token');
+const BASE_URL = `${API_BASE_URL}/api`;
+
+export const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('blob:')) {
+    return path;
+  }
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+};
+
+const getAuthToken = () => localStorage.getItem('token') || localStorage.getItem('access_token');
 
 export const api = {
   async request(endpoint, options = {}) {

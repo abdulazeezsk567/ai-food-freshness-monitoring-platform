@@ -4,12 +4,19 @@ from app.models.user import User, UserRole
 from app.models.food_item import FoodItem, FoodCategory
 from app.models.inventory import Inventory
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 def seed_database(db: Session):
     # Seed Users if not already present
     if db.query(User).count() == 0:
+        admin_pass = settings.ADMIN_PASSWORD
+        # In production, prevent the default password from being used if not explicitly customized
+        if settings.ENVIRONMENT == "production" and admin_pass == "Admin123!":
+            import secrets
+            admin_pass = secrets.token_urlsafe(16)
+
         users_data = [
-            ("System Admin", "admin@foodfreshness.com", "Admin123!", UserRole.ADMINISTRATOR.value),
+            ("System Admin", settings.ADMIN_EMAIL, admin_pass, UserRole.ADMINISTRATOR.value),
             ("Sarah Retailer", "retail@foodfreshness.com", "Manager123!", UserRole.RETAIL_MANAGER.value),
             ("David Inspector", "inspector@foodfreshness.com", "Inspector123!", UserRole.FOOD_QUALITY_INSPECTOR.value),
             ("Warehouse Dave", "warehouse@foodfreshness.com", "Warehouse123!", UserRole.WAREHOUSE_OPERATOR.value),

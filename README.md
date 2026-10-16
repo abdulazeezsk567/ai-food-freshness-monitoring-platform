@@ -186,6 +186,55 @@ The application will be accessible at:
 
 ---
 
+### Option C: Deploying to Render.com
+
+The platform includes a native Render Blueprint (`render.yaml`) that configures the backend, frontend, and PostgreSQL database.
+
+#### Method 1: Automated Blueprint Deployment (Recommended)
+1. Fork or push this repository to your GitHub account.
+2. Sign in to your [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** -> **Blueprint**.
+4. Connect this GitHub repository (`ai-food-freshness-monitoring-platform`).
+5. Render will detect `render.yaml` and display the resources to create:
+   - **Database**: `food-freshness-db` (PostgreSQL)
+   - **Backend**: `food-freshness-backend` (FastAPI Web Service)
+   - **Frontend**: `food-freshness-frontend` (React Static Site)
+6. Click **Apply**.
+7. Once the backend finishes building, verify its health endpoint at `https://<backend-name>.onrender.com/health`.
+8. Once the frontend finishes building, open `https://<frontend-name>.onrender.com` in your browser.
+
+#### Method 2: Manual Service Deployment via Render Dashboard
+If you prefer configuring services individually:
+1. **Create PostgreSQL Database**:
+   - In Render, click **New +** -> **PostgreSQL**.
+   - Name: `food-freshness-db`, Database: `food_freshness_db`, User: `postgres`.
+   - Copy the **Internal Database URL** once provisioned.
+2. **Create Backend Web Service**:
+   - Click **New +** -> **Web Service**.
+   - Connect repository, select **Root Directory**: `backend`.
+   - Runtime: `Python 3`, Build Command: `pip install -r requirements.txt`.
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+   - Health Check Path: `/health`.
+   - Environment Variables:
+     - `DATABASE_URL`: Your Render PostgreSQL Connection String.
+     - `SECRET_KEY`: A secure 32+ character string (or generate in Render).
+     - `ENVIRONMENT`: `production`.
+     - `PYTHON_VERSION`: `3.11.9`.
+3. **Create Frontend Static Site**:
+   - Click **New +** -> **Static Site**.
+   - Connect repository, select **Root Directory**: `frontend`.
+   - Build Command: `npm install && npm run build`.
+   - Publish Directory: `dist`.
+   - Environment Variable:
+     - `VITE_API_BASE_URL`: `https://<your-backend-service>.onrender.com`.
+   - Add Rewrite Rule: Source `/*`, Destination `/index.html`, Action `Rewrite`.
+
+> **Persistent Storage Note**: On Render's Free tier, the web service container filesystem is ephemeral (uploaded images persist while the service runs, but reset on server sleep/restart). For permanent image persistence, attach a Render Disk (requires Starter plan) or configure an S3-compatible object storage provider.
+
+> **Production Admin Credentials**: In the Render Blueprint, `ADMIN_PASSWORD` is automatically generated with a secure random value (`generateValue: true`). To sign in as System Admin (`admin@foodfreshness.com`) in production, view the generated password in your Render Dashboard under **food-freshness-backend** -> **Environment** tab. Development passwords are not permitted in production.
+
+---
+
 ## Automated Verification & Testing
 
 Run all backend tests:

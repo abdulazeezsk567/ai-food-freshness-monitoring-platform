@@ -10,12 +10,13 @@ from app.models.user import User
 from app.models.inventory import Inventory
 from app.models.analysis import AnalysisResult
 from app.schemas.freshness import AnalysisResultResponse, AnalysisUploadResponse
+from app.core.config import settings
 from app.core.security import get_current_active_user
 from app.ml import run_freshness_pipeline, validate_image_file
 
 router = APIRouter(prefix="/api/freshness", tags=["Freshness Analysis & CV Engine"])
 
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "freshness"))
+UPLOAD_DIR = os.path.abspath(os.path.join(settings.UPLOAD_DIR, "freshness"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}

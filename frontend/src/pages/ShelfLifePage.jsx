@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, API_BASE_URL } from '../services/api';
 import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { 
@@ -136,8 +136,8 @@ export const ShelfLifePage = ({ initialInventoryId = null }) => {
 
   const handleDownloadShelfLifeJson = async (predId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/reports/shelf-life/${predId}/json`, {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/api/reports/shelf-life/${predId}/json`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

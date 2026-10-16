@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, API_BASE_URL, getMediaUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
@@ -104,8 +104,8 @@ export const InventoryPage = ({ setActiveTab, onSelectReport, onNavigateShelfLif
 
   const handleExportCSV = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/reports/inventory/csv', {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const res = await fetch(`${API_BASE_URL}/api/reports/inventory/csv`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -334,7 +334,7 @@ export const InventoryPage = ({ setActiveTab, onSelectReport, onNavigateShelfLif
               {historyRecords.map((rec) => (
                 <div key={rec.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <img src={rec.image_path} alt="Analysis" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                    <img src={getMediaUrl(rec.image_path)} alt="Analysis" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
                     <div>
                       <div className="font-bold text-white">Score: {rec.freshness_score} / 100</div>
                       <div className="text-[10px] text-slate-400">{new Date(rec.created_at).toLocaleString()}</div>

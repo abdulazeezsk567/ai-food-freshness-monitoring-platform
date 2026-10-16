@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, API_BASE_URL, getMediaUrl } from '../services/api';
 import { useNotification } from '../context/NotificationContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { CATEGORIES } from '../utils/constants';
@@ -145,8 +145,8 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
       }
 
       // Perform analysis request
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/freshness/analyze', {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/api/freshness/analyze`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -473,7 +473,7 @@ export const FreshnessAnalysisPage = ({ setActiveTab, onSelectReport }) => {
                     <div key={r.id} className="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between gap-4 hover:border-purple-500/40 transition">
                       <div className="flex items-center gap-3">
                         <img
-                          src={r.image_path}
+                          src={getMediaUrl(r.image_path)}
                           alt="Analyzed food"
                           className="w-12 h-12 rounded-lg object-cover border border-slate-700"
                         />

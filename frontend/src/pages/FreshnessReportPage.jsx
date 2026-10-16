@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_BASE_URL, getMediaUrl } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { ArrowLeft, Printer, ShieldCheck, Sparkles, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -11,8 +12,8 @@ export const FreshnessReportPage = ({ report, onBack }) => {
 
   const handleExportJSON = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/reports/freshness/${report.id}/json`, {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const res = await fetch(`${API_BASE_URL}/api/reports/freshness/${report.id}/json`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -87,7 +88,7 @@ export const FreshnessReportPage = ({ report, onBack }) => {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-5 text-center">
             <img
-              src={report.image_path}
+              src={getMediaUrl(report.image_path)}
               alt="Inspected Food"
               className="max-h-64 mx-auto rounded-2xl object-cover border border-slate-700 print:border-slate-300 shadow-xl"
             />

@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -16,9 +16,18 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "super_secret_jwt_key_change_in_production_32bytes_min"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    ADMIN_EMAIL: str = "admin@foodfreshness.com"
+    ADMIN_PASSWORD: str = "Admin123!"
     
     # Database URL
     DATABASE_URL: str = "sqlite:///./food_freshness.db"
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def assemble_database_url(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [
@@ -27,6 +36,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:8000"
     ]
+    CORS_ORIGIN_REGEX: Optional[str] = r"^https:\/\/.*\.onrender\.com$"
 
     @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
@@ -34,5 +44,8 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    # Uploads Storage
+    UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads"))
 
 settings = Settings()

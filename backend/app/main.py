@@ -20,7 +20,7 @@ from app.routers import (
 from app.services.seed import seed_database
 
 # Ensure uploads directory exists
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+UPLOAD_DIR = os.path.abspath(settings.UPLOAD_DIR)
 os.makedirs(os.path.join(UPLOAD_DIR, "freshness"), exist_ok=True)
 
 @asynccontextmanager
@@ -50,9 +50,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
 )
 
 # Mount Static Files for Uploaded Images
