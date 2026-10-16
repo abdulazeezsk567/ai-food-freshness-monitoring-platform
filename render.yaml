@@ -57,6 +57,5 @@ services:
 databases:
   - name: food-freshness-db
     databaseName: food_freshness_db
-    user: postgres
     plan: free
     region: oregon
